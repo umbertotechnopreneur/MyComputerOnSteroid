@@ -13,6 +13,7 @@
  * VBWR E */
 
 #include <winres.h>
+#pragma code_page(65001)
 #include "resource.h"
 
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
@@ -20,7 +21,121 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 STRINGTABLE
 BEGIN
     IDS_COLUMN_NAME "Name"
+    IDS_FOLDERS "Folders"
+    IDS_DRIVES "Devices and drives"
+    IDS_APPS "Apps"
+    IDS_FILES "Files"
+    IDS_SECTION "Section"
+    IDS_LOCATION "Location"
+    IDS_ADD_FOLDER "Add favorite folder..."
+    IDS_ADD_APP "Add favorite app..."
+    IDS_ADD_FILE "Add favorite file..."
+    IDS_MANAGE "Manage favorite shortcuts"
+    IDS_ERROR_ADD "Could not add all selected favorites. Items already added remain available."
+    IDS_ERROR_READ "Could not read the launcher items."
+    IDS_ERROR_REMOVE "Could not remove all favorite references. Original items were preserved."
+    IDS_CHANGE_ICON "Change launcher icon..."
+    IDS_ICON_FILES "Icons (*.ico)"
+    IDS_ERROR_ICON "Could not change all selected launcher icons. Original items were preserved."
+    IDS_RECENTS "Recent items"
+    IDS_RECENT_FILTERS "Filter recent items..."
+    IDS_RECENT_SHOW "Show recent items"
+    IDS_RECENT_RESTORE "Restore items hidden from recent items"
+    IDS_RECENT_PIN "Pin in recent items"
+    IDS_RECENT_UNPIN "Unpin from recent items"
+    IDS_RECENT_HIDE "Hide from recent items"
+    IDS_RECENT_ADD "Add to launcher favorites"
+    IDS_RECENT_DATE "Recent entry updated"
+    IDS_RECENT_PINNED "Pinned in recent items"
+    IDS_PINNED_YES "Yes"
+    IDS_ERROR_RECENTS "Could not update all recent items. Documents and Windows history were preserved."
+    IDS_TYPE_ALL "All types"
+    IDS_TYPE_DOCUMENTS "Documents (PDF, Word, Excel, Markdown...)"
+    IDS_TYPE_IMAGES "Images"
+    IDS_TYPE_AUDIO "Audio"
+    IDS_TYPE_VIDEO "Video"
+    IDS_TYPE_DEVELOPMENT "Development (CSS, HTML, JS, C++...)"
+    IDS_TYPE_OTHER "Other"
 END
+
+IDD_RECENT_FILTERS DIALOGEX 0, 0, 310, 183
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Recent item filters"
+FONT 9, "Segoe UI"
+BEGIN
+    CONTROL "Show the Recent items section", IDC_RECENT_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 12, 10, 280, 12
+    LTEXT "Name contains:", -1, 12, 33, 80, 12
+    EDITTEXT IDC_RECENT_NAME, 96, 31, 202, 14, ES_AUTOHSCROLL
+    LTEXT "Type:", -1, 12, 57, 80, 12
+    COMBOBOX IDC_RECENT_CATEGORY, 96, 55, 202, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Extension:", -1, 12, 81, 80, 12
+    EDITTEXT IDC_RECENT_EXTENSION, 96, 79, 202, 14, ES_AUTOHSCROLL
+    LTEXT "Leave empty for all extensions, or enter pdf, jpg, md...", -1, 96, 97, 202, 20
+    LTEXT "Sort by Recent entry updated using Explorer's Sort menu or the column in Details view. This is the Windows recent shortcut's update time, not the document's last-opened time.", -1, 12, 123, 286, 28
+    DEFPUSHBUTTON "Apply", IDOK, 182, 161, 56, 14
+    PUSHBUTTON "Cancel", IDCANCEL, 242, 161, 56, 14
+END
+
+LANGUAGE LANG_ITALIAN, SUBLANG_ITALIAN
+STRINGTABLE
+BEGIN
+    IDS_COLUMN_NAME "Nome"
+    IDS_FOLDERS "Cartelle"
+    IDS_DRIVES "Dispositivi e unità"
+    IDS_APPS "App"
+    IDS_FILES "File"
+    IDS_SECTION "Sezione"
+    IDS_LOCATION "Percorso"
+    IDS_ADD_FOLDER "Aggiungi cartella preferita..."
+    IDS_ADD_APP "Aggiungi app preferita..."
+    IDS_ADD_FILE "Aggiungi file preferito..."
+    IDS_MANAGE "Gestisci collegamenti preferiti"
+    IDS_ERROR_ADD "Impossibile aggiungere tutti i preferiti. Quelli già aggiunti restano disponibili."
+    IDS_ERROR_READ "Impossibile leggere gli elementi del launcher."
+    IDS_ERROR_REMOVE "Impossibile rimuovere tutti i collegamenti preferiti. Gli originali sono rimasti intatti."
+    IDS_CHANGE_ICON "Cambia icona nel launcher..."
+    IDS_ICON_FILES "Icone (*.ico)"
+    IDS_ERROR_ICON "Impossibile cambiare tutte le icone selezionate. Gli originali sono rimasti intatti."
+    IDS_RECENTS "Recenti"
+    IDS_RECENT_FILTERS "Filtra recenti..."
+    IDS_RECENT_SHOW "Mostra recenti"
+    IDS_RECENT_RESTORE "Ripristina elementi nascosti dai recenti"
+    IDS_RECENT_PIN "Fissa nei recenti"
+    IDS_RECENT_UNPIN "Non fissare nei recenti"
+    IDS_RECENT_HIDE "Nascondi dai recenti"
+    IDS_RECENT_ADD "Aggiungi ai preferiti del launcher"
+    IDS_RECENT_DATE "Data nei recenti"
+    IDS_RECENT_PINNED "Fissato nei recenti"
+    IDS_PINNED_YES "Sì"
+    IDS_ERROR_RECENTS "Impossibile aggiornare tutti i recenti. I documenti e la cronologia di Windows sono rimasti intatti."
+    IDS_TYPE_ALL "Tutti i tipi"
+    IDS_TYPE_DOCUMENTS "Documenti (PDF, Word, Excel, Markdown...)"
+    IDS_TYPE_IMAGES "Immagini"
+    IDS_TYPE_AUDIO "Audio"
+    IDS_TYPE_VIDEO "Video"
+    IDS_TYPE_DEVELOPMENT "Sviluppo (CSS, HTML, JS, C++...)"
+    IDS_TYPE_OTHER "Altro"
+END
+
+IDD_RECENT_FILTERS DIALOGEX 0, 0, 310, 190
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Filtra recenti"
+FONT 9, "Segoe UI"
+BEGIN
+    CONTROL "Mostra la sezione Recenti", IDC_RECENT_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 12, 10, 280, 12
+    LTEXT "Il nome contiene:", -1, 12, 33, 80, 12
+    EDITTEXT IDC_RECENT_NAME, 96, 31, 202, 14, ES_AUTOHSCROLL
+    LTEXT "Tipo:", -1, 12, 57, 80, 12
+    COMBOBOX IDC_RECENT_CATEGORY, 96, 55, 202, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Estensione:", -1, 12, 81, 80, 12
+    EDITTEXT IDC_RECENT_EXTENSION, 96, 79, 202, 14, ES_AUTOHSCROLL
+    LTEXT "Vuoto per tutte le estensioni, oppure pdf, jpg, md...", -1, 96, 97, 202, 20
+    LTEXT "Ordina per Data nei recenti dal menu Ordina o dalla colonna nella vista Dettagli. La data indica l'aggiornamento del collegamento nei recenti di Windows, non l'ultima apertura del documento.", -1, 12, 123, 286, 35
+    DEFPUSHBUTTON "Applica", IDOK, 182, 168, 56, 14
+    PUSHBUTTON "Annulla", IDCANCEL, 242, 168, 56, 14
+END
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0,0,0,0
@@ -32,7 +147,11 @@ VS_VERSION_INFO VERSIONINFO
  FILEFLAGS VS_FF_PRERELEASE
 #endif
  FILEOS VOS_NT_WINDOWS32
+#ifdef MCOS_EXECUTABLE
+ FILETYPE VFT_APP
+#else
  FILETYPE VFT_DLL
+#endif
  FILESUBTYPE 0
 BEGIN
     BLOCK "StringFileInfo"
@@ -40,11 +159,15 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "Umberto Giacobbi | umbertogiacobbi.biz"
-            VALUE "FileDescription", "MyComputerOnSteroid Shell provider (bootstrap)"
+            VALUE "FileDescription", "MyComputerOnSteroid native launcher"
             VALUE "FileVersion", "0.0.0.0"
-            VALUE "InternalName", "MyComputerOnSteroid.Shell"
+            VALUE "InternalName", "MyComputerOnSteroid"
             VALUE "LegalCopyright", "Copyright (c) 2026 Umberto Giacobbi"
+#ifdef MCOS_EXECUTABLE
+            VALUE "OriginalFilename", "MyComputerOnSteroid.exe"
+#else
             VALUE "OriginalFilename", "MyComputerOnSteroid.Shell.dll"
+#endif
             VALUE "ProductName", "MyComputerOnSteroid"
             VALUE "ProductVersion", "Unreleased"
         END

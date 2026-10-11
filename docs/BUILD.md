@@ -1,51 +1,80 @@
-# Build the native provider
+# Build, test and install
 
 ## Prerequisites
 
-- Windows 11 x64 or ARM64.
-- PowerShell 7.
-- Visual Studio 2022 or newer, or Build Tools, with Desktop development with C++.
-- Windows SDK, MSVC C++ tools, CMake 3.25 or newer and Ninja.
-- MSVC ARM64 tools for an ARM64 target.
+- Windows 11 x64 or ARM64; PowerShell 7.
+- Visual Studio 2022 or newer / Build Tools with Desktop development with C++.
+- Windows SDK, MSVC, CMake 3.25+ and Ninja; ARM64 tools for that target.
+- WiX Toolset 3.14 (candle.exe and light.exe) for MSI packaging.
 
-The script discovers Visual Studio with `vswhere`, including an installed preview
-edition, and enters its developer environment. It prefers the bundled CMake and
-Ninja. No dependencies are downloaded or installed by the build.
+Build.ps1 discovers Visual Studio through vswhere, including previews, and enters
+its developer environment. It prefers bundled CMake/Ninja and downloads nothing.
+Run invocations in separate PowerShell processes:
 
-From the repository root, run:
+~~~powershell
+pwsh -NoProfile -File ./scripts/Build.ps1 -Architecture x64 -Configuration Debug
+pwsh -NoProfile -File ./scripts/Build.ps1 -Architecture x64 -Configuration Release
+pwsh -NoProfile -File ./scripts/Build.ps1 -Architecture arm64 -Configuration Release
+pwsh -NoProfile -File ./scripts/Test.ps1 -Architecture x64 -Configuration Release -SkipBuild
+~~~
 
-```powershell
-pwsh -NoProfile -File ./scripts/Build.ps1 -Architecture x64
-pwsh -NoProfile -File ./scripts/Build.ps1 -Architecture arm64
-```
+DLL, opener and test EXE are under artifacts/build/windows-<architecture>-<configuration>/bin/.
+The project uses C++20, Unicode, static MSVC CRT, /W4 /WX, /permissive-, /sdl,
+CFG, ASLR and NX. Debug output is for development. No managed UI runtime is linked.
 
-Run architecture builds sequentially. Each has an isolated directory:
+Tests load the DLL without registering it. Disposable targets, history inputs
+and separate stores are retained under artifacts/tests/. Run tests on matching
+native Windows. These are not Explorer UI or MSI lifecycle checks.
 
-- `artifacts/build/windows-x64-debug/`
-- `artifacts/build/windows-arm64-debug/`
+## MSI
 
-The DLL is in the selected directory's `bin/` folder. Debug builds use the MSVC
-Debug runtime and are development artifacts, not redistributable releases.
+~~~powershell
+pwsh -NoProfile -File ./scripts/Build-Msi.ps1 -Architecture x64
+pwsh -NoProfile -File ./scripts/Build-Msi.ps1 -Architecture arm64
+~~~
 
-## Visual Studio and CMake
+Packages are under artifacts/installer/<architecture>/. Full WiX ICE validation
+runs during linking. Use -WixDirectory for the installed WiX 3.14 tools and
+-SkipBuild to package existing Release output.
 
-Open the repository folder in Visual Studio and select the matching Debug preset.
-The presets use an externally selected compiler architecture. The script is the
-reproducible command-line entry point; a plain terminal needs the corresponding
-Visual Studio developer environment before invoking CMake directly.
+**0.0.0 is an unreleased development placeholder.** The owner chooses release
+versions. Packaging does not install, sign, create a release or publish binaries.
+The package uses Windows Installer's basic UI and no third-party UI/custom-action DLL.
 
-The project uses C++20, Unicode, `/W4`, `/WX`, `/permissive-`, `/sdl` and Control
-Flow Guard. No managed runtime or third-party UI framework is linked.
+Install the matching MSI to register My Computer Enhanced under This PC and the
+navigation tree. Installation is per-machine and Windows requests elevation.
+The Start-menu shortcut or MyComputerOnSteroid.exe opens the namespace.
+A loaded provider can require an Explorer restart after an update; the installer
+does not force one. Keep installer lifecycle and UI checks separate.
 
-## Build boundaries
+For an explicit development repair of the same installed 0.0.0 product, pass its
+existing ProductCode through -ProductId. Reinstall with REINSTALL=ALL and
+REINSTALLMODE=vamus to recache the newly authored MSI. Another ProductCode for the
+same development version is not a supported update. Actual releases need a new
+owner-chosen version.
 
-This bootstrap exports a COM class factory, but has no registration procedure.
-Do not use `regsvr32` on it: `DllRegisterServer` is not implemented. Compilation
-does not change the registry, restart Explorer or open a window.
+Uninstall through Windows Installed Apps. The MSI owns its binaries, registration
+and Start-menu shortcut. Per-user favorites, icon files and recent settings remain.
+A clean-machine install/upgrade/uninstall round trip still needs validation.
 
-The workflow in `.github/workflows/build.yml` compiles Debug x64 and ARM64 on
-Windows. It does not run runtime tests, register the DLL, publish a release or
-upload binary artifacts. See [validation](VALIDATION.md) for observed results.
+## Developer registration
 
-Keep generated files in ignored `artifacts/`. If removing a build directory,
-first resolve it and verify that it is under this repository's `artifacts/`.
+Register-Development.ps1 deploys an immutable Debug copy and registers only this
+project's per-user CLSID/This PC junction. -Unregister is bounded by ownership
+markers. The script refuses registration over an installed machine MSI.
+
+On the tested workstation, the machine MSI provider opened successfully; an
+earlier HKCU-only experiment was refused by Explorer. This does not establish
+a general Windows restriction on per-user namespace registration.
+
+Do not use regsvr32: no DllRegisterServer export is supplied.
+
+## CI and artifacts
+
+GitHub Actions compiles Debug x64 and ARM64 on Windows Server 2022. The x64 job
+also runs the isolated suite. CI does not register, install, exercise Windows 11 UI
+or publish binaries. Required PR checks are Debug x64 and Debug arm64.
+
+Keep generated files, probes and private screenshots under ignored artifacts/.
+Before recursive cleanup, resolve and verify the target is inside that directory.
+See [validation](VALIDATION.md) for observed results.

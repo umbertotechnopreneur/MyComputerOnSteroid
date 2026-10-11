@@ -12,3 +12,14 @@
   different facts. Keep their evidence separate.
 - Use the current checked-in VibeWare templates: the movement identity and product
   publisher are separate, and historical template wording may have changed.
+- A delegated target IPropertyStoreFactory can bypass the namespace's name/date
+  properties. Let DefView build a store from the provider's GetDetailsEx instead;
+  test IShellItem2 consumers as well as direct IShellFolder2 properties.
+- Content/Tile views ask for layout property lists as well as names. Correct
+  GetDisplayNameOf output alone did not prevent serialized property-store labels.
+- A column proplist needs the documented 0 flag for columns visible by default.
+  Unflagged entries exist in the property system but remain hidden in the view.
+- Native menu bitmaps are borrowed by HMENU. Retain their GDI ownership until
+  menus close, use premultiplied alpha, and preserve text when decoration fails.
+- A successful asynchronous BrowseObject call is not proof that navigation
+  finished. Confirm the active folder before querying or operating on its view.

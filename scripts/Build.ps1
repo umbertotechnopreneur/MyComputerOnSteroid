@@ -15,7 +15,9 @@ VBWR E #>
 [CmdletBinding()]
 param(
     [ValidateSet('x64', 'arm64')]
-    [string] $Architecture = 'x64'
+    [string] $Architecture = 'x64',
+    [ValidateSet('Debug', 'Release')]
+    [string] $Configuration = 'Debug'
 )
 
 Set-StrictMode -Version Latest
@@ -52,14 +54,14 @@ if (-not (Test-Path -LiteralPath $cmakePath)) {
 }
 if (Test-Path -LiteralPath $ninjaFolder) { $env:PATH = "$ninjaFolder;$env:PATH" }
 
-$preset = "windows-$Architecture-debug"
+$preset = "windows-$Architecture-$($Configuration.ToLowerInvariant())"
 Push-Location -LiteralPath $projectRoot
 try {
     & $cmakePath --preset $preset
     if ($LASTEXITCODE -ne 0) { throw "CMake configure failed ($LASTEXITCODE)." }
     & $cmakePath --build --preset $preset
     if ($LASTEXITCODE -ne 0) { throw "C++ compilation failed ($LASTEXITCODE)." }
-    Write-Host "Built: artifacts/build/$preset/bin/MyComputerOnSteroid.Shell.dll"
+    Write-Host "Built native DLL, launcher and tests: artifacts/build/$preset/bin/"
     Write-Host 'Compilation only: no registration, Explorer restart or installation was performed.'
 }
 finally {

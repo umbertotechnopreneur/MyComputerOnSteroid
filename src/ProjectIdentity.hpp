@@ -19,6 +19,8 @@
 namespace mcos::identity
 {
 inline constexpr wchar_t product_name[] = L"MyComputerOnSteroid";
+inline constexpr wchar_t launcher_name[] = L"My Computer Enhanced";
+inline constexpr wchar_t parsing_name[] = L"::{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\::{B36B9212-2D35-4E65-8A97-0AA5D280E157}";
 inline constexpr wchar_t creator[] = L"Umberto Giacobbi";
 inline constexpr wchar_t publisher[] = L"umbertogiacobbi.biz";
 inline constexpr wchar_t website[] = L"https://umbertogiacobbi.biz";

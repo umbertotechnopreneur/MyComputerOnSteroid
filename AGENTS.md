@@ -41,8 +41,9 @@
   core components; do not put business rules in menu callbacks or drawing code.
 - Prefer the public Shell view interfaces. Do not depend on Explorer's private
   child-window classes, inject into it or claim a modern menu from IContextMenu.
-- DefView background customization and the exact Windows 11 compact menu on
-  launcher items remain verification gates. Preserve the distinction in docs.
+- Background/acrylic and export/import are outside the owner's current scope.
+  Preserve actual Windows 11 compact-menu and Show more options evidence in docs;
+  the classic IContextMenu contract alone does not prove the compact menu.
 - Never allow a C++ exception across a COM ABI boundary. Define ownership of every
   COM interface and PIDL, use RAII, handle HRESULTs and keep Shell callbacks fast.
 - Keep DllMain minimal. No filesystem, registry, thread or UI initialization there.
