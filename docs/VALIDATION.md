@@ -1,5 +1,28 @@
 # Validation record
 
+## Group order and document transfer, 2026-10-12
+
+- Local x64 Debug and final Release native suites passed with `/W4 /WX`; final
+  Release covers real document CF_HDROP paths, renamed aliases, recent cache
+  hashes, mixed-section selections, format enumeration and copy-only attributes.
+- The new transfer check run against the previously installed DLL reproduced an
+  unavailable CF_HDROP format in its mixed-section data object. The updated DLL
+  passes the same check and preserves reference identities and original bytes.
+- Category tests cover stable IDs, Drives/Folders/Apps ordering, app grouping,
+  Office before PDF regardless of family-definition order, Development before
+  Other extensions, and unknown category rejection. Name/date ordering remains
+  independent. Final Debug ARM64 cross-compilation passed; no ARM64 runtime claim.
+- x64 Release MSI passed WiX ICE validation. Authorized repair returned 3010;
+  Explorer restart loaded the Program Files DLL matching the tested Release hash.
+- A read-only probe obtained IDataObject from the actual Explorer folder and
+  verified both exported document paths against their shortcut targets. Native
+  UI Automation and a private screenshot showed Drives, Folders, Office and PDF
+  in that order; Apps was empty in that collection. Native layout was preserved.
+- No document was uploaded to GPT. Actual GPT/other receivers and an end-to-end
+  desktop drag remain acceptance checks; COM data-format checks do not prove them.
+- InfoTips were discussed only; no custom tooltip implementation was added.
+  Windows file associations and icons remain unchanged by this work.
+
 ## Collection organization and dialog polish, 2026-10-11
 
 This extends the installed x64 prototype with collection search, extension/family

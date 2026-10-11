@@ -41,6 +41,55 @@ std::string contents(const std::filesystem::path& path)
     std::ifstream input(path,std::ios::binary);
     return {std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
 }
+void verify_file_transfer(IShellFolder2* shell,std::vector<PCUITEMID_CHILD> selection)
+{
+    ComPtr<IDataObject> data;
+    check(shell->GetUIObjectOf(nullptr,static_cast<UINT>(selection.size()),selection.data(),IID_IDataObject,nullptr,
+        reinterpret_cast<void**>(data.GetAddressOf())));
+    FORMATETC format{CF_HDROP,nullptr,DVASPECT_CONTENT,-1,TYMED_HGLOBAL};
+    check(data->QueryGetData(&format));
+    STGMEDIUM medium{}; check(data->GetData(&format,&medium));
+    const auto drop=static_cast<HDROP>(medium.hGlobal);
+    bool valid=DragQueryFileW(drop,0xffffffff,nullptr,0)==selection.size();
+    for(UINT index=0;index<selection.size();++index)
+    {
+        const auto item=shell::read_item_id(selection[index]);
+        const auto expected=item.section==Section::files || item.section==Section::recents ? item_target_path(item) : item.path;
+        wchar_t path[32768]{};
+        valid&=DragQueryFileW(drop,index,path,ARRAYSIZE(path))!=0 && _wcsicmp(expected.c_str(),path)==0;
+    }
+    ReleaseStgMedium(&medium);
+    require(valid,"external file receivers get real document paths and names, never recent cache hashes");
+    ComPtr<IShellItemArray> references; check(SHCreateShellItemArrayFromDataObject(data.Get(),IID_PPV_ARGS(&references)));
+    DWORD count{}; check(references->GetCount(&count));
+    require(count==selection.size(),"native Shell transfer retains the full reference selection");
+    for(DWORD index=0;index<count;++index)
+    {
+        ComPtr<IShellItem> reference; check(references->GetItemAt(index,&reference));
+        require(!_wcsicmp(display_name(reference.Get(),SIGDN_FILESYSPATH).c_str(),shell::read_item_id(selection[index]).path.c_str()),
+            "Shell transfer identity remains the owned reference, protecting document targets from reference operations");
+    }
+    format.cfFormat=static_cast<CLIPFORMAT>(RegisterClipboardFormatW(CFSTR_PREFERREDDROPEFFECT));
+    check(data->GetData(&format,&medium));
+    auto* effect=static_cast<DWORD*>(GlobalLock(medium.hGlobal));
+    const bool copy=effect && *effect==DROPEFFECT_COPY;
+    if(effect) GlobalUnlock(medium.hGlobal); ReleaseStgMedium(&medium);
+    require(copy,"document export prefers copy instead of moving originals");
+    SFGAOF attributes=SFGAO_CANMOVE;
+    check(shell->GetAttributesOf(static_cast<UINT>(selection.size()),selection.data(),&attributes));
+    require(!(attributes & SFGAO_CANMOVE),"the Shell drag source does not advertise moving original documents");
+    FORMATETC bad=format; bad.tymed=TYMED_ISTREAM;
+    require(data->QueryGetData(&bad)==DV_E_TYMED,"export format negotiation rejects an unsupported medium");
+    ComPtr<IEnumFORMATETC> formats; check(data->EnumFormatEtc(DATADIR_GET,&formats));
+    FORMATETC offered{}; bool hdrop=false;
+    while(formats->Next(1,&offered,nullptr)==S_OK)
+    {
+        if(offered.cfFormat==CF_HDROP) hdrop=true;
+        require(SUCCEEDED(data->QueryGetData(&offered)),"every advertised export format is actually available");
+        CoTaskMemFree(offered.ptd);
+    }
+    require(hdrop,"file paths are discoverable through native data-object format enumeration");
+}
 void write_test_icon(const std::filesystem::path& path)
 {
     std::vector<unsigned char> bytes;
@@ -225,6 +274,7 @@ void recent_tests(const std::filesystem::path& fixture,IShellFolder2* shell)
 
     std::vector<Pidl> ids; std::vector<PCUITEMID_CHILD> selected;
     for(const auto& entry:entries) { ids.push_back(shell::make_item_id(entry)); selected.push_back(ids.back().get()); }
+    verify_file_transfer(shell,selected);
     VARIANT value{}; check(shell->GetDetailsEx(selected[0],&PKEY_DateModified,&value));
     require(value.vt==VT_DATE,"native date column exposes a typed date for sorting"); VariantClear(&value);
     for(const auto& key:{PKEY_ItemNameDisplay,PKEY_ItemName,PKEY_FileName})
@@ -299,6 +349,8 @@ void collection_view_tests(const std::filesystem::path& fixture,IShellFolder2* s
     CatalogItem first{Section::files,first_link.wstring()},second{Section::files,second_link.wstring()};
     auto first_id=shell::make_item_id(first),second_id=shell::make_item_id(second);
     PCUITEMID_CHILD selection[]{first_id.get(),second_id.get()};
+    verify_file_transfer(shell,{first_id.get()});
+    verify_file_transfer(shell,{first_id.get(),second_id.get()});
     auto settings=original_settings;
     settings.families=L"Contratti = .PDF, .docx\r\nSviluppo = cpp; h; md";
     const auto families=parse_families(settings.families);
@@ -343,6 +395,33 @@ void collection_view_tests(const std::filesystem::path& fixture,IShellFolder2* s
     check(provider->CreateCategory(&category,IID_PPV_ARGS(&categorizer)));
     check(categorizer->GetCategory(2,selection,groups)); check(categorizer->GetCategoryInfo(groups[0],&info));
     require(groups[0]!=groups[1] && wcscmp(info.wszName,L".pdf")==0,"Shell extension grouping separates actual target suffixes");
+    require(static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,2,1)))<0 &&
+        static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,1,3)))<0 &&
+        static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,3,groups[0])))<0,
+        "group presentation puts drives before folders, then apps and document extensions");
+    require(categorizer->CompareCategory(CATSORT_DEFAULT,999999,groups[0])==E_INVALIDARG,
+        "group comparisons reject unknown IDs instead of assigning an arbitrary order");
+    settings.families=L"PDF = pdf\nSviluppo = cpp\nOffice = docx";
+    save_view_settings(settings);
+    check(provider->GetCategoryForSCID(&PKEY_KindText,&category)); categorizer.Reset();
+    check(provider->CreateCategory(&category,IID_PPV_ARGS(&categorizer)));
+    check(categorizer->GetCategory(2,selection,groups));
+    require(static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,groups[1],groups[0])))<0 &&
+        static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,groups[0],groups[1])))>0,
+        "Office precedes PDF regardless of family definition order or enumeration order");
+    std::ofstream(fixture/L"Code.cpp")<<"Source fixture original";
+    std::ofstream(fixture/L"Unknown.xyz")<<"Unknown fixture original";
+    const CatalogItem code{Section::files,add_favorite(shell_item(parse_pidl((fixture/L"Code.cpp").wstring()).get()).Get()).wstring()};
+    const CatalogItem unknown{Section::files,add_favorite(shell_item(parse_pidl((fixture/L"Unknown.xyz").wstring()).get()).Get()).wstring()};
+    auto code_id=shell::make_item_id(code),unknown_id=shell::make_item_id(unknown);
+    PCUITEMID_CHILD others[]{code_id.get(),unknown_id.get()}; DWORD other_groups[2]{};
+    check(categorizer->GetCategory(2,others,other_groups));
+    require(static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,groups[0],other_groups[0])))<0 &&
+        static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,other_groups[0],other_groups[1])))<0,
+        "PDF precedes Development and unassigned extensions stay at the end");
+    check(categorizer->GetCategoryInfo(other_groups[1],&info));
+    require(wcscmp(info.wszName,text(IDS_OTHER_EXTENSIONS).c_str())==0,"unknown file suffixes retain the Other extensions group");
+    remove_favorite(code); remove_favorite(unknown);
     ComPtr<IFolderViewSettings> defaults; check(shell->QueryInterface(IID_PPV_ARGS(&defaults)));
     SORTCOLUMN sort[2]{}; UINT sorts{}; check(defaults->GetSortColumns(sort,2,&sorts));
     require(sorts==1 && IsEqualPropertyKey(sort[0].propkey,PKEY_ItemNameDisplay) && sort[0].direction==SORT_ASCENDING,
@@ -480,6 +559,7 @@ int wmain(int count,wchar_t** arguments)
             check(SHCreateShellItemArrayFromDataObject(mixed_data.Get(),IID_PPV_ARGS(&transferred)));
             DWORD transferred_count{}; check(transferred->GetCount(&transferred_count));
             require(transferred_count==favorite_selection.size(),"mixed-section Shell data object round-trips every favorite");
+            verify_file_transfer(shell.Get(),favorite_selection);
             check(enumerator->Reset());
             ComPtr<IEnumIDList> clone; check(enumerator->Clone(&clone));
             PITEMID_CHILD pair[2]{}; check(clone->Next(2,pair,&fetched));
@@ -504,6 +584,16 @@ int wmain(int count,wchar_t** arguments)
             check(categories->CreateCategory(&group,IID_PPV_ARGS(&categorizer)));
             for(DWORD section=1;section<=5;++section)
             { CATEGORY_INFO info{}; check(categorizer->GetCategoryInfo(section,&info)); require(info.wszName[0]!=0,"category has native display text"); }
+            require(static_cast<short>(HRESULT_CODE(categorizer->CompareCategory(CATSORT_DEFAULT,2,1)))<0,
+                "the section grouping also puts Devices and drives first");
+            check(categories->GetCategoryForSCID(&PKEY_KindText,&group)); categorizer.Reset();
+            check(categories->CreateCategory(&group,IID_PPV_ARGS(&categorizer)));
+            for(const auto& id:ids)
+                if(shell::read_item_id(id.get()).section==Section::apps)
+                {
+                    PCUITEMID_CHILD app_child=id.get(); DWORD app_group{}; check(categorizer->GetCategory(1,&app_child,&app_group));
+                    require(app_group==3,"application favorites use one stable Apps group instead of a duplicate extension family");
+                }
 
             ComPtr<IShellView> view; check(shell->CreateViewObject(nullptr,IID_PPV_ARGS(&view)));
             require(view!=nullptr,"system DefView object is created");

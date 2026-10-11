@@ -29,3 +29,8 @@
   distinct metadata. Test each search/group/order field against its actual source.
 - Refresh and filtering are asynchronous in Explorer. Wait for the view count to
   converge to enumeration before treating an intermediate empty view as failure.
+- Namespace group identity and presentation order are different contracts. Use
+  explicit category ranks without renumbering persisted section identifiers.
+- Shell-aware destinations and file-upload receivers can consume different
+  IDataObject formats. Validate CF_HDROP paths as well as Shell PIDL identity;
+  a Shell-item round trip alone does not prove document-upload compatibility.

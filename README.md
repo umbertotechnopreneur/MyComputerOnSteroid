@@ -67,9 +67,13 @@ Audio = mp3, wav, flac
 ~~~
 
 Each extension belongs to one family. Invalid or duplicate assignments are
-rejected before saving. Unassigned suffixes use Other extensions; drives and
-folders retain their own groups when grouping is enabled. Groups use native
-Shell collapsing and alphabetical order; there is no manual item ordering.
+rejected before saving. Groups start with Devices and drives, Folders and Apps.
+Family grouping then puts Office, PDF and Development (Sviluppo) first, followed
+by other families in natural alphabetical order. Unassigned suffixes use Other
+extensions at the end; files without a suffix follow that group. Extension mode
+sorts the remaining suffix groups alphabetically. Groups retain native Shell
+collapsing; item name/date ordering is separate from the default group order.
+Explorer's own descending group choice can reverse that order.
 
 Order items by Name or Item date, ascending or descending. Item date means local
 target modification time for favorites and history-entry update time for recent
@@ -102,6 +106,13 @@ Favorites and private recent state live under
 %LOCALAPPDATA%\MyComputerOnSteroid\. They are not uploaded or included in the MSI.
 Wallpaper/acrylic, its photo control and export/import are outside the current
 owner-requested scope. There is no managed or web UI runtime.
+
+Dragging file favorites or recent documents to an application exports their real
+target paths through the standard file-transfer formats. Native Shell identities
+still refer to the owned shortcuts; folder/app favorites keep shortcut semantics.
+Document export prefers copy and the namespace does not advertise move. Upload
+behavior depends on the receiving application; actual GPT attachment acceptance
+has not yet been verified. Removing a launcher reference preserves its target.
 
 ## Build, test and package
 

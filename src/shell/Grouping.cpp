@@ -111,7 +111,7 @@ public:
             for(UINT i=0;i<count;++i)
             {
                 const auto item=read_item_id(items[i]);
-                if(mode_==GroupMode::sections || item.section==Section::folders || item.section==Section::drives)
+                if(mode_==GroupMode::sections || item.section==Section::folders || item.section==Section::drives || item.section==Section::apps)
                 { ids[i]=static_cast<DWORD>(item.section); continue; }
                 std::wstring name;
                 const auto status=guarded([&]{
@@ -142,7 +142,8 @@ public:
         return guarded([&]{
             std::lock_guard lock(mutex_);
             int comparison{};
-            if(first<100 || second<100) comparison=first<second ? -1 : first>second ? 1 : 0;
+            const auto first_rank=category_rank(first),second_rank=category_rank(second);
+            if(first_rank!=second_rank) comparison=first_rank<second_rank ? -1 : 1;
             else comparison=StrCmpLogicalW(category_name(first).c_str(),category_name(second).c_str());
             const short order=comparison<0 ? -1 : comparison>0 ? 1 : 0;
             return MAKE_HRESULT(SEVERITY_SUCCESS,0,static_cast<USHORT>(order));
@@ -154,6 +155,33 @@ private:
     GroupMode mode_;
     std::mutex mutex_;
     std::vector<std::wstring> names_;
+    // Category identity remains stable; presentation order is independent of
+    // the Section enum and of whichever file happens to enumerate first.
+    unsigned category_rank(DWORD id)
+    {
+        if(id<100)
+        {
+            category_name(id); // Validate unknown section IDs before comparing.
+            switch(static_cast<Section>(id))
+            {
+            case Section::drives: return 0;
+            case Section::folders: return 1;
+            case Section::apps: return 2;
+            case Section::files: return 3;
+            case Section::recents: return 4;
+            }
+        }
+        const auto name=category_name(id);
+        if(name==text(IDS_OTHER_EXTENSIONS)) return 100;
+        if(name==text(IDS_NO_EXTENSION)) return 101;
+        if(mode_==GroupMode::families)
+        {
+            if(!_wcsicmp(name.c_str(),L"Office")) return 10;
+            if(!_wcsicmp(name.c_str(),L"PDF")) return 11;
+            if(!_wcsicmp(name.c_str(),L"Sviluppo") || !_wcsicmp(name.c_str(),L"Development")) return 12;
+        }
+        return 20; // Remaining families/extensions use natural alphabetical order.
+    }
     std::wstring category_name(DWORD id)
     {
         if(id>=1 && id<=5) return text(section_label(static_cast<Section>(id)));

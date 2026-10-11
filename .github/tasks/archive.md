@@ -1,5 +1,16 @@
 # Completed work archive
 
+## 2026-10-12 - MCS-090: group presentation and document export
+
+- Kept stable group IDs while putting Drives before Folders and Apps, and Office,
+  PDF and Development before other families and unassigned extensions.
+- Kept app favorites in one section in both dynamic grouping modes.
+- Added native IDataObject adaptation for real document filenames/paths, with
+  owned Shell reference identity, copy preference and no source move capability.
+- x64 native tests and ARM64 compilation passed; the tested x64 MSI was installed
+  and actual Explorer group/data-object observations are in validation.
+- Actual GPT/desktop drag acceptance remains open; InfoTips are a proposal only.
+
 Delivered implementation records belong here. Keep remaining verification in
 [todo.md](todo.md), with detailed evidence in [validation](../../docs/VALIDATION.md).
 
