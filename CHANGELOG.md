@@ -28,6 +28,7 @@
 
 ### Fixed
 
+- Keep the Hide command decorated when only the older Segoe MDL2 font is present.
 - Recent-item presentation across Shell views: preserve document names and icons,
   define native Content/Tile layouts, and prevent target property factories from
   overriding launcher metadata with serialized property-store text.

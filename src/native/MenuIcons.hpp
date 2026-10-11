@@ -18,10 +18,11 @@
 
 namespace mcos
 {
-// Public Segoe Fluent Icons code points; MDL2 Assets uses the same glyphs.
+// Public system-font code points. The older MDL2 font lacks the Hide glyph;
+// it uses its Blocked symbol as the compatibility fallback.
 enum class MenuGlyph : wchar_t
 {
-    favorite = 0xe734, pin = 0xe718, unpin = 0xe77a, hide = 0xed1a,
+    favorite = 0xe734, pin = 0xe718, unpin = 0xe77a, hide = 0xed1a, blocked = 0xe733,
     picture = 0xeb9f, folder = 0xe8b7, folder_open = 0xe838,
     apps = 0xe71d, document = 0xe8a5, filter = 0xe71c,
     history = 0xe81c, restore = 0xe7a7

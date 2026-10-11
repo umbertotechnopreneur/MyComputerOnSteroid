@@ -67,9 +67,13 @@ MenuBitmap render(MenuGlyph glyph, int pixels, COLORREF color) noexcept
     SelectObjectBack restore_bitmap{dc.get(), SelectObject(dc.get(), bitmap.get())};
     if (!restore_bitmap.previous || restore_bitmap.previous == HGDI_ERROR) return {};
 
-    const wchar_t character = static_cast<wchar_t>(glyph);
     for (PCWSTR face : {L"Segoe Fluent Icons", L"Segoe MDL2 Assets"})
     {
+        // Windows Server CI and older system fonts do not have Fluent Hide.
+        // Preserve a visible native symbol without weakening the menu tests.
+        const auto compatible = glyph == MenuGlyph::hide && _wcsicmp(face, L"Segoe MDL2 Assets") == 0
+            ? MenuGlyph::blocked : glyph;
+        const wchar_t character = static_cast<wchar_t>(compatible);
         std::unique_ptr<void, DeleteFont> font(CreateFontW(-pixels, 0, 0, 0, FW_NORMAL,
             FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             ANTIALIASED_QUALITY, DEFAULT_PITCH, face));

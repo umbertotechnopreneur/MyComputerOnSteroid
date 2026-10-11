@@ -79,8 +79,10 @@ personal names, paths, shortcuts and inventories are not published.
 The matching x64 development product was repaired with REINSTALL=ALL and
 REINSTALLMODE=vamus to recache the freshly authored MSI. Exit 3010 requested an
 OS reboot for pending old-file cleanup. An authorized Explorer restart loaded the
-new DLL; no OS reboot was forced. The final installed/tested DLL SHA-256 was
-`4DD90302446328106E6F51DC68CBA3BBFD7D2D29DFCC0843D66B10C14B00E92A`.
+new DLL; no OS reboot was forced. A subsequent repair after the session resumed
+installed the font-compatibility update with exit 0, while the provider was
+unloaded. The final installed/tested DLL SHA-256 was
+`AA493D01565EBE468DA416E1FB8B00999EE8C7AE5FB0D6EB01AFA41163DC7A71`.
 
 An old per-user development registration remains on this workstation. Its cleanup
 was rejected by automatic approval review and was not bypassed. Actual Explorer
@@ -100,6 +102,9 @@ source/security/accessibility review. The owner deferred further recent-manageme
 UX work. Background/acrylic, its photo control and export/import were cancelled.
 
 The current workflow adds isolated x64 tests to Debug x64/ARM64 compilation.
+Its first x64 run exposed a missing Hide glyph in the runner's older MDL2 font;
+the compatibility renderer now uses that font's Blocked symbol for Hide. The
+Windows 11 Fluent rendering observed above retains the eye-with-slash glyph.
 Required PR checks remain **Debug x64** and **Debug arm64**. Current remote
 source-delivery evidence is in the repository's PR checks and
 [GitHub Actions](https://github.com/umbertotechnopreneur/MyComputerOnSteroid/actions);
