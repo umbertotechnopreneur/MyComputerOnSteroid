@@ -79,7 +79,7 @@ MenuBitmap render(MenuGlyph glyph, int pixels, COLORREF color) noexcept
         if (!GetTextFaceW(dc.get(), ARRAYSIZE(actual_face), actual_face) || _wcsicmp(actual_face, face) != 0) continue;
         // Font family presence does not guarantee a particular glyph/version.
         // Try the compatible symbol in either font only if Hide cannot render.
-        const MenuGlyph candidates[]{glyph, MenuGlyph::blocked};
+        const MenuGlyph candidates[]{glyph, MenuGlyph::remove};
         const UINT count = glyph == MenuGlyph::hide ? 2u : 1u;
         for (UINT candidate = 0; candidate < count; ++candidate)
         {

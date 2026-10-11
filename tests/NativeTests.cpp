@@ -75,10 +75,10 @@ void verify_launcher_icons(HMENU popup,IContextMenu* menu)
                         OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,face);
                     if(!font) continue;
                     HGDIOBJ previous=SelectObject(dc,font); wchar_t actual[LF_FACESIZE]{};
-                    const wchar_t characters[]{0xed1a,0xe733}; WORD glyphs[]{0xffff,0xffff};
+                    const wchar_t characters[]{0xed1a,0xe738}; WORD glyphs[]{0xffff,0xffff};
                     GetTextFaceW(dc,ARRAYSIZE(actual),actual);
                     GetGlyphIndicesW(dc,characters,2,glyphs,GGI_MARK_NONEXISTING_GLYPHS);
-                    std::wcerr<<L"Font "<<face<<L" maps to "<<actual<<L"; Hide/Blocked indices "
+                    std::wcerr<<L"Font "<<face<<L" maps to "<<actual<<L"; Hide/Remove indices "
                         <<std::hex<<glyphs[0]<<L"/"<<glyphs[1]<<std::dec<<L"\n";
                     SelectObject(dc,previous); DeleteObject(font);
                 }

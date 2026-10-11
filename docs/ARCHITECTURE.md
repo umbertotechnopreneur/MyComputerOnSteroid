@@ -58,7 +58,7 @@ text in high contrast. The menu object retains bitmap ownership, including older
 DPI/theme variants. Missing fonts or decoration failure leave the text commands
 available. No owner-drawn replacement or private Explorer theming API is used.
 Font versions can differ even within a family. If Hide cannot render, try the
-compatible Blocked symbol in either installed icon font.
+documented Remove symbol (E738) in either installed icon font.
 
 References supply their name aliases, content/tile property lists and the
 documented content layout through GetDetailsEx. Launcher items decline target
