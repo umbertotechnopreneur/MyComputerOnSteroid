@@ -1,5 +1,55 @@
 # Validation record
 
+## Collection organization and dialog polish, 2026-10-11
+
+This extends the installed x64 prototype with collection search, extension/family
+groups and name/date ordering. It does not close the unrelated acceptance tasks
+below or establish a release.
+
+| Check | Result |
+| --- | --- |
+| Final Debug/Release x64 compilation and isolated native suite | Passed with `/W4 /WX` |
+| Final Debug/Release ARM64 cross-compilation | Passed; ARM64 runtime not tested |
+| Both native Release MSIs | Passed full WiX ICE validation |
+| Installed payload | Matches tested Release DLL; authorized Explorer restart loaded Program Files DLL |
+| Native search/options dialog | Invoked from the installed provider in actual Windows 11 Explorer; Apply returned S_OK |
+| Dialog presentation | Right-aligned labels, group boxes, readable hints and colored OS stock icons visually checked at current desktop scale |
+| Actual view search | Name, target path and case/dot-normalized exact extension filters passed; view count converged to filtered enumeration |
+| Empty search results and recovery | No-match collection empty; clearing query restored the original collection |
+| Actual view grouping | Extension and family keys applied; custom PDF/Markdown family header visibly rendered after bringing a matching item into view |
+| Actual view order | Name ascending and typed Item date descending with name tie-breaker verified through active IFolderView2 |
+| Reopening | Extension grouping and name ordering retained after Explorer restart |
+| Details properties | Original five visible columns retained; eight total available |
+| Realized labels after updates | No empty or serialized hexadecimal labels in the sampled native items |
+| Broader DPI/themes/accessibility | Not tested; remaining acceptance stays open |
+
+The native suite covers target suffix versus alias/.lnk, name versus path scope,
+exact extension matching, editable families and duplicate rejection, Unicode
+atomic persistence, existing categorizer updates, actual filtered COM enumeration,
+typed chronological dates, stable tie-breaks, corrupt-preference fallback,
+original-byte preservation and COM unload. Tests use isolated stores, not private
+Windows history.
+
+Explorer refresh is asynchronous: an intermediate empty view was observed after
+clearing a no-match filter. Bounded checks waited for its item count to converge
+to enumeration before asserting recovery. A custom header below the viewport was
+not initially realized by UI Automation; bringing a matching item into view
+confirmed the header visually and through UIA. These diagnostics did not require
+product workarounds or private window classes.
+
+Actual UI experiments temporarily changed search/group/order and a family
+definition, then restored the prior preferences through the native dialog. No
+favorites or originals were deleted. Private inventory and screenshots remain in
+ignored artifacts and are not published. File icons still use Windows associations;
+no external C/C++/MP3/WAV icon pack was imported.
+
+The matching 0.0.0 x64 MSI repair returned 3010. No OS reboot was forced. Installed
+and tested Release DLL SHA-256:
+`AD7863B600695289086D7FCBE71FDAD1EE5A908708610655EC4F63BAF0CDDB4D`.
+The old per-user registration was not removed. Required source publication checks
+remain Debug x64 (including isolated tests) and Debug arm64; their current results
+are recorded on the delivery PR and GitHub Actions.
+
 ## Installed development prototype, 2026-10-11
 
 Current scope: native launcher, optional recent documents, native menu glyphs and

@@ -4,6 +4,10 @@
 
 ### Added
 
+- Native Search and organize dialog with right-aligned labels, grouped controls
+  and Windows stock icons; name/path/exact-extension search across references.
+- Extension and editable-family Shell groups, name/date ordering in either
+  direction, optional metadata columns and atomic per-user preferences.
 - Native C++20 COM launcher in Explorer's standard view: Folders, Devices and
   drives, Apps and Files; native selection, view modes and normal sorting.
 - Owned shortcut favorites, safe add/drop, argument-aware deduplication,

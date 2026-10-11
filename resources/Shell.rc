@@ -56,6 +56,58 @@ BEGIN
     IDS_TYPE_VIDEO "Video"
     IDS_TYPE_DEVELOPMENT "Development (CSS, HTML, JS, C++...)"
     IDS_TYPE_OTHER "Other"
+    IDS_VIEW_OPTIONS "Search and organize..."
+    IDS_CLEAR_SEARCH "Clear launcher search"
+    IDS_EXTENSION "Extension"
+    IDS_FAMILY "Extension family"
+    IDS_ITEM_DATE "Item date (modified / recent)"
+    IDS_NO_EXTENSION "No extension"
+    IDS_OTHER_EXTENSIONS "Other extensions"
+    IDS_GROUP_SECTIONS "Launcher sections"
+    IDS_GROUP_EXTENSIONS "File extension"
+    IDS_GROUP_FAMILIES "Custom extension families"
+    IDS_GROUP_NONE "No grouping"
+    IDS_SEARCH_ANY "Name, path or extension"
+    IDS_SEARCH_NAME "Name contains"
+    IDS_SEARCH_PATH "Target path contains"
+    IDS_SEARCH_EXTENSION "Exact extension (pdf or .pdf)"
+    IDS_SORT_NAME "Name"
+    IDS_SORT_DATE "Item date"
+    IDS_SORT_ASCENDING "Ascending"
+    IDS_SORT_DESCENDING "Descending"
+    IDS_FAMILY_DEFAULTS "PDF = pdf\r\nOffice = doc, docx, xls, xlsx, ppt, pptx\r\nDevelopment = c, cpp, h, hpp, cs, css, html, js, ts, json, md\r\nImages = jpg, jpeg, png, gif, webp, bmp, ico\r\nAudio = mp3, wav, flac, m4a, ogg\r\nVideo = mp4, mkv, avi, mov, webm\r\nApps = exe, com, cmd, bat, ps1"
+    IDS_ERROR_VIEW "Could not apply search or view settings. Favorite references and original items were preserved."
+    IDS_INVALID_FAMILIES "Use one family per line: Office = docx, xlsx, pptx. Use distinct family names and assign each extension only once. Up to 32 families, 60 characters per name."
+    IDS_NO_SEARCH_RESULTS "No launcher items match this search. Right-click and choose Clear launcher search."
+END
+
+IDD_VIEW_OPTIONS DIALOGEX 0, 0, 380, 328
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Search and organize"
+FONT 9, "Segoe UI"
+BEGIN
+    GROUPBOX "Search", -1, 8, 8, 364, 80
+    CONTROL "", IDC_VIEW_SEARCH_ICON, "Static", SS_ICON, 18, 23, 16, 16
+    RTEXT "Search:", -1, 38, 23, 54, 12
+    EDITTEXT IDC_VIEW_QUERY, 100, 21, 260, 14, ES_AUTOHSCROLL
+    RTEXT "Search in:", -1, 38, 47, 54, 12
+    COMBOBOX IDC_VIEW_FIELD, 100, 45, 260, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Launcher items and enabled recent items only. No search inside folders.", IDC_VIEW_SEARCH_HINT, 100, 65, 260, 20
+    GROUPBOX "View", -1, 8, 94, 364, 82
+    CONTROL "", IDC_VIEW_GROUP_ICON, "Static", SS_ICON, 18, 109, 16, 16
+    RTEXT "Group by:", -1, 38, 109, 54, 12
+    COMBOBOX IDC_VIEW_GROUP, 100, 107, 260, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    RTEXT "Sort by:", -1, 38, 133, 54, 12
+    COMBOBOX IDC_VIEW_SORT, 100, 131, 150, 70, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX IDC_VIEW_DIRECTION, 256, 131, 104, 70, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Date: local target modification; history entry update for recent items. Missing dates stay empty.", IDC_VIEW_DATE_HINT, 100, 152, 260, 20
+    GROUPBOX "Extension families", -1, 8, 182, 364, 116
+    CONTROL "", IDC_VIEW_FAMILY_ICON, "Static", SS_ICON, 18, 198, 16, 16
+    EDITTEXT IDC_VIEW_FAMILIES, 44, 196, 316, 75, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT "One per line: Office = docx, xlsx, pptx. Assign each extension once. Drives and folders keep their own groups.", IDC_VIEW_FAMILY_HINT, 20, 275, 340, 20
+    PUSHBUTTON "Clear search", IDC_VIEW_CLEAR, 12, 306, 84, 14
+    DEFPUSHBUTTON "Apply", IDOK, 252, 306, 56, 14
+    PUSHBUTTON "Cancel", IDCANCEL, 312, 306, 56, 14
 END
 
 IDD_RECENT_FILTERS DIALOGEX 0, 0, 310, 183
@@ -115,6 +167,58 @@ BEGIN
     IDS_TYPE_VIDEO "Video"
     IDS_TYPE_DEVELOPMENT "Sviluppo (CSS, HTML, JS, C++...)"
     IDS_TYPE_OTHER "Altro"
+    IDS_VIEW_OPTIONS "Cerca e organizza..."
+    IDS_CLEAR_SEARCH "Azzera ricerca del launcher"
+    IDS_EXTENSION "Estensione"
+    IDS_FAMILY "Famiglia di estensioni"
+    IDS_ITEM_DATE "Data elemento (modifica / recente)"
+    IDS_NO_EXTENSION "Senza estensione"
+    IDS_OTHER_EXTENSIONS "Altre estensioni"
+    IDS_GROUP_SECTIONS "Sezioni del launcher"
+    IDS_GROUP_EXTENSIONS "Estensione del file"
+    IDS_GROUP_FAMILIES "Famiglie di estensioni personalizzate"
+    IDS_GROUP_NONE "Nessun raggruppamento"
+    IDS_SEARCH_ANY "Nome, percorso o estensione"
+    IDS_SEARCH_NAME "Il nome contiene"
+    IDS_SEARCH_PATH "Il percorso di destinazione contiene"
+    IDS_SEARCH_EXTENSION "Estensione esatta (pdf o .pdf)"
+    IDS_SORT_NAME "Nome"
+    IDS_SORT_DATE "Data elemento"
+    IDS_SORT_ASCENDING "Crescente"
+    IDS_SORT_DESCENDING "Decrescente"
+    IDS_FAMILY_DEFAULTS "PDF = pdf\r\nOffice = doc, docx, xls, xlsx, ppt, pptx\r\nSviluppo = c, cpp, h, hpp, cs, css, html, js, ts, json, md\r\nImmagini = jpg, jpeg, png, gif, webp, bmp, ico\r\nAudio = mp3, wav, flac, m4a, ogg\r\nVideo = mp4, mkv, avi, mov, webm\r\nApp = exe, com, cmd, bat, ps1"
+    IDS_ERROR_VIEW "Impossibile applicare la ricerca o le impostazioni della vista. Collegamenti preferiti e originali sono rimasti intatti."
+    IDS_INVALID_FAMILIES "Usa una famiglia per riga: Office = docx, xlsx, pptx. I nomi delle famiglie devono essere diversi e ogni estensione può apparire una sola volta. Massimo 32 famiglie, 60 caratteri per nome."
+    IDS_NO_SEARCH_RESULTS "Nessun elemento del launcher corrisponde alla ricerca. Tasto destro e Azzera ricerca del launcher per ripristinare gli elementi."
+END
+
+IDD_VIEW_OPTIONS DIALOGEX 0, 0, 380, 328
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Cerca e organizza"
+FONT 9, "Segoe UI"
+BEGIN
+    GROUPBOX "Ricerca", -1, 8, 8, 364, 80
+    CONTROL "", IDC_VIEW_SEARCH_ICON, "Static", SS_ICON, 18, 23, 16, 16
+    RTEXT "Cerca:", -1, 38, 23, 54, 12
+    EDITTEXT IDC_VIEW_QUERY, 100, 21, 260, 14, ES_AUTOHSCROLL
+    RTEXT "Cerca in:", -1, 38, 47, 54, 12
+    COMBOBOX IDC_VIEW_FIELD, 100, 45, 260, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Solo elementi del launcher e recenti abilitati. Non cerca dentro le cartelle.", IDC_VIEW_SEARCH_HINT, 100, 65, 260, 20
+    GROUPBOX "Visualizzazione", -1, 8, 94, 364, 82
+    CONTROL "", IDC_VIEW_GROUP_ICON, "Static", SS_ICON, 18, 109, 16, 16
+    RTEXT "Raggruppa per:", -1, 38, 109, 54, 12
+    COMBOBOX IDC_VIEW_GROUP, 100, 107, 260, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    RTEXT "Ordina per:", -1, 38, 133, 54, 12
+    COMBOBOX IDC_VIEW_SORT, 100, 131, 150, 70, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX IDC_VIEW_DIRECTION, 256, 131, 104, 70, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Data: modifica della destinazione locale; aggiornamento della voce per i recenti. Date assenti: vuoto.", IDC_VIEW_DATE_HINT, 100, 152, 260, 20
+    GROUPBOX "Famiglie di estensioni", -1, 8, 182, 364, 116
+    CONTROL "", IDC_VIEW_FAMILY_ICON, "Static", SS_ICON, 18, 198, 16, 16
+    EDITTEXT IDC_VIEW_FAMILIES, 44, 196, 316, 75, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL
+    LTEXT "Una per riga: Office = docx, xlsx, pptx. Ogni estensione va assegnata una volta. Dischi e cartelle mantengono i propri gruppi.", IDC_VIEW_FAMILY_HINT, 20, 275, 340, 20
+    PUSHBUTTON "Azzera ricerca", IDC_VIEW_CLEAR, 12, 306, 84, 14
+    DEFPUSHBUTTON "Applica", IDOK, 252, 306, 56, 14
+    PUSHBUTTON "Annulla", IDCANCEL, 312, 306, 56, 14
 END
 
 IDD_RECENT_FILTERS DIALOGEX 0, 0, 310, 190

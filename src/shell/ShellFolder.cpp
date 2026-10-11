@@ -18,7 +18,9 @@
 #include "Grouping.hpp"
 #include "FavoriteMenu.hpp"
 #include "../core/Recents.hpp"
+#include "../core/ViewSettings.hpp"
 #include "../native/RecentDialog.hpp"
+#include "../native/ViewDialog.hpp"
 #include "../ProjectIdentity.hpp"
 #include "../../resources/resource.h"
 #include <Propkey.h>
@@ -26,6 +28,8 @@
 #include <Propsys.h>
 #include <CommCtrl.h>
 #include <algorithm>
+#include <ExDisp.h>
+#include <ShlGuid.h>
 
 namespace mcos::shell
 {
@@ -94,6 +98,58 @@ HRESULT make_string(const std::wstring& source,STRRET* result)
 }
 FILETIME recent_time(const CatalogItem& item)
 { return item.section==Section::recents ? recent_info(item).updated : FILETIME{}; }
+std::wstring formatted_time(FILETIME time)
+{
+    if(!time.dwLowDateTime && !time.dwHighDateTime) return {};
+    FILETIME local{}; SYSTEMTIME system{};
+    check_win32(FileTimeToLocalFileTime(&time,&local)); check_win32(FileTimeToSystemTime(&local,&system));
+    wchar_t date[128]{},clock[128]{};
+    if(!GetDateFormatEx(LOCALE_NAME_USER_DEFAULT,DATE_SHORTDATE,&system,nullptr,date,ARRAYSIZE(date),nullptr) ||
+       !GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT,TIME_NOSECONDS,&system,nullptr,clock,ARRAYSIZE(clock)))
+        check(HRESULT_FROM_WIN32(GetLastError()));
+    return std::wstring(date)+L" "+clock;
+}
+PROPERTYKEY group_key(GroupMode mode) noexcept
+{
+    return mode==GroupMode::extension ? PKEY_FileExtension : mode==GroupMode::families ? PKEY_KindText :
+        mode==GroupMode::none ? PKEY_Null : PKEY_ItemTypeText;
+}
+ComPtr<IShellView> active_view(HWND owner,PCIDLIST_ABSOLUTE root)
+{
+    // Find our host through public Shell automation/services, never private HWND
+    // classes. Hold the view only for the command; retaining it in its folder
+    // would create a COM lifetime cycle.
+    if(!owner || !root) check(E_UNEXPECTED);
+    const auto top=GetAncestor(owner,GA_ROOT);
+    ComPtr<IShellWindows> windows; check(CoCreateInstance(CLSID_ShellWindows,nullptr,CLSCTX_LOCAL_SERVER,IID_PPV_ARGS(&windows)));
+    long count{}; check(windows->get_Count(&count));
+    for(long i=0;i<count;++i)
+    {
+        VARIANT index{}; index.vt=VT_I4; index.lVal=i;
+        ComPtr<IDispatch> entry;
+        if(FAILED(windows->Item(index,&entry)) || !entry) continue;
+        ComPtr<IWebBrowser2> browser; SHANDLE_PTR hwnd{};
+        if(FAILED(entry.As(&browser)) || FAILED(browser->get_HWND(&hwnd)) || reinterpret_cast<HWND>(hwnd)!=top) continue;
+        ComPtr<IServiceProvider> services; ComPtr<IShellBrowser> host; ComPtr<IShellView> view;
+        if(FAILED(browser.As(&services)) || FAILED(services->QueryService(SID_STopLevelBrowser,IID_PPV_ARGS(&host))) ||
+           FAILED(host->QueryActiveShellView(&view))) continue;
+        ComPtr<IFolderView> folder_view; ComPtr<IPersistFolder2> folder; PIDLIST_ABSOLUTE actual{};
+        if(FAILED(view.As(&folder_view)) || FAILED(folder_view->GetFolder(IID_PPV_ARGS(&folder))) ||
+           FAILED(folder->GetCurFolder(&actual))) continue;
+        Pidl current(actual); if(ILIsEqual(root,current.get())) return view;
+    }
+    check(E_NOINTERFACE); return {};
+}
+void apply_view(IShellView* shell_view,const ViewSettings& settings)
+{
+    ComPtr<IFolderView2> view; check(shell_view->QueryInterface(IID_PPV_ARGS(&view)));
+    check(view->SetGroupBy(group_key(settings.grouping),TRUE));
+    SORTCOLUMN columns[2]{{settings.order==ItemOrder::name ? PKEY_ItemNameDisplay : PKEY_ItemDate,
+        settings.descending ? SORT_DESCENDING : SORT_ASCENDING},{PKEY_ItemNameDisplay,SORT_ASCENDING}};
+    check(view->SetSortColumns(columns,settings.order==ItemOrder::date ? 2 : 1));
+    check(view->SetText(FVST_EMPTYTEXT,settings.query.empty() ? L"" : text(IDS_NO_SEARCH_RESULTS).c_str()));
+    check(shell_view->Refresh());
+}
 std::wstring detail(const CatalogItem& item,UINT column)
 {
     switch(column)
@@ -103,19 +159,11 @@ std::wstring detail(const CatalogItem& item,UINT column)
     case 2:
         if(item.section==Section::drives) return item.path;
         return display_name(shell_item(navigation_target(item).get()).Get(),SIGDN_DESKTOPABSOLUTEPARSING);
-    case 3:
-    {
-        if(item.section!=Section::recents) return {};
-        const auto time=recent_time(item);
-        FILETIME local{}; SYSTEMTIME system{};
-        check_win32(FileTimeToLocalFileTime(&time,&local)); check_win32(FileTimeToSystemTime(&local,&system));
-        wchar_t date[128]{},clock[128]{};
-        if(!GetDateFormatEx(LOCALE_NAME_USER_DEFAULT,DATE_SHORTDATE,&system,nullptr,date,ARRAYSIZE(date),nullptr) ||
-           !GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT,TIME_NOSECONDS,&system,nullptr,clock,ARRAYSIZE(clock)))
-            check(HRESULT_FROM_WIN32(GetLastError()));
-        return std::wstring(date)+L" "+clock;
-    }
+    case 3: return formatted_time(recent_time(item));
     case 4: return item.section==Section::recents && recent_info(item).pinned ? text(IDS_PINNED_YES) : L"";
+    case 5: return item_extension(item);
+    case 6: return item_family(item,parse_families(view_settings().families));
+    case 7: return formatted_time(item_date(item));
     default: check(E_INVALIDARG); return {};
     }
 }
@@ -181,9 +229,14 @@ HRESULT ShellFolder::EnumObjects(HWND,SHCONTF flags,IEnumIDList** result) noexce
     *result=nullptr;
     auto status=guarded([&]{
         auto items=enumerate_catalog();
+        const auto settings=view_settings();
         std::erase_if(items,[&](const CatalogItem& item){
             const bool folder=item.section==Section::folders || item.section==Section::drives;
-            return folder ? !(flags & SHCONTF_FOLDERS) : !(flags & SHCONTF_NONFOLDERS);
+            if(folder ? !(flags & SHCONTF_FOLDERS) : !(flags & SHCONTF_NONFOLDERS)) return true;
+            bool matches=false;
+            // A broken reference's optional metadata cannot blank other results.
+            guarded([&]{matches=matches_search(item,settings); return S_OK;});
+            return !matches;
         });
         *result=new ItemEnumerator(std::move(items)); return S_OK;
     });
@@ -219,9 +272,9 @@ HRESULT ShellFolder::CompareIDs(LPARAM column,PCUIDLIST_RELATIVE first,PCUIDLIST
         const auto index=static_cast<UINT>(column & SHCIDS_COLUMNMASK);
         const auto a=read_item_id(first),b=read_item_id(second);
         int comparison=0;
-        if(index==3)
+        if(index==3 || index==7)
         {
-            const auto first_time=recent_time(a),second_time=recent_time(b);
+            const auto first_time=index==3 ? recent_time(a) : item_date(a),second_time=index==3 ? recent_time(b) : item_date(b);
             comparison=CompareFileTime(&first_time,&second_time);
         }
         else comparison=StrCmpLogicalW(detail(a,index).c_str(),detail(b,index).c_str());
@@ -367,13 +420,15 @@ HRESULT ShellFolder::GetDefaultSearchGUID(GUID* value) noexcept
 HRESULT ShellFolder::EnumSearches(IEnumExtraSearch** result) noexcept
 { if(!result) return E_POINTER; *result=nullptr; return E_NOTIMPL; }
 HRESULT ShellFolder::GetDefaultColumn(DWORD,ULONG* sort,ULONG* display) noexcept
-{ if(!sort || !display) return E_POINTER; *sort=3; *display=0; return S_OK; }
+{ if(!sort || !display) return E_POINTER;
+  return guarded([&]{*sort=view_settings().order==ItemOrder::name ? 0u : 7u; *display=0; return S_OK;}); }
 HRESULT ShellFolder::GetDefaultColumnState(UINT column,SHCOLSTATEF* state) noexcept
 {
     if(!state) return E_POINTER;
     *state=0;
-    if(column>4) return E_INVALIDARG;
-    *state=(column==3 ? SHCOLSTATE_TYPE_DATE : SHCOLSTATE_TYPE_STR)|SHCOLSTATE_ONBYDEFAULT; return S_OK;
+    if(column>7) return E_INVALIDARG;
+    *state=(column==3 || column==7 ? SHCOLSTATE_TYPE_DATE : SHCOLSTATE_TYPE_STR)|
+        (column<5 ? SHCOLSTATE_ONBYDEFAULT : 0); return S_OK;
 }
 HRESULT ShellFolder::GetDetailsEx(PCUITEMID_CHILD pidl,const SHCOLUMNID* key,VARIANT* value) noexcept
 {
@@ -410,10 +465,12 @@ HRESULT ShellFolder::GetDetailsEx(PCUITEMID_CHILD pidl,const SHCOLUMNID* key,VAR
            (IsEqualPropertyKey(*key,PKEY_LayoutPattern_ContentViewModeForBrowse) ||
             IsEqualPropertyKey(*key,PKEY_LayoutPattern_ContentViewModeForSearch)))
             return InitVariantFromString(LAYOUTPATTERN_CVMFB_DELTA,value);
-        if(IsEqualPropertyKey(*key,PKEY_DateModified))
+        if(IsEqualPropertyKey(*key,PKEY_FileExtension)) return InitVariantFromString(detail(item,5).c_str(),value);
+        if(IsEqualPropertyKey(*key,PKEY_KindText)) return InitVariantFromString(detail(item,6).c_str(),value);
+        if(IsEqualPropertyKey(*key,PKEY_DateModified) || IsEqualPropertyKey(*key,PKEY_ItemDate))
         {
-            if(item.section!=Section::recents) return S_OK;
-            const auto time=recent_time(item);
+            const auto time=IsEqualPropertyKey(*key,PKEY_ItemDate) ? item_date(item) : recent_time(item);
+            if(!time.dwLowDateTime && !time.dwHighDateTime) return S_OK;
             FILETIME local{}; SYSTEMTIME system{}; DATE date{};
             check_win32(FileTimeToLocalFileTime(&time,&local)); check_win32(FileTimeToSystemTime(&local,&system));
             if(!SystemTimeToVariantTime(&system,&date)) return E_INVALIDARG;
@@ -442,10 +499,11 @@ HRESULT ShellFolder::GetDetailsOf(PCUITEMID_CHILD pidl,UINT column,SHELLDETAILS*
     if(!result) return E_POINTER;
     *result={};
     return guarded([&]{
-        if(column>4) return E_INVALIDARG;
+        if(column>7) return E_INVALIDARG;
         result->fmt=LVCFMT_LEFT; result->cxChar=column==2 ? 60 : 28;
         if(pidl) return make_string(detail(read_item_id(pidl),column),&result->str);
-        constexpr UINT labels[]{IDS_COLUMN_NAME,IDS_SECTION,IDS_LOCATION,IDS_RECENT_DATE,IDS_RECENT_PINNED};
+        constexpr UINT labels[]{IDS_COLUMN_NAME,IDS_SECTION,IDS_LOCATION,IDS_RECENT_DATE,IDS_RECENT_PINNED,
+            IDS_EXTENSION,IDS_FAMILY,IDS_ITEM_DATE};
         return make_string(text(labels[column]),&result->str);
     });
 }
@@ -453,8 +511,9 @@ HRESULT ShellFolder::MapColumnToSCID(UINT column,SHCOLUMNID* key) noexcept
 {
     if(!key) return E_POINTER;
     *key={};
-    if(column>4) return E_INVALIDARG;
-    const PROPERTYKEY keys[]{PKEY_ItemNameDisplay,PKEY_ItemTypeText,PKEY_ItemPathDisplay,PKEY_DateModified,PKEY_Comment};
+    if(column>7) return E_INVALIDARG;
+    const PROPERTYKEY keys[]{PKEY_ItemNameDisplay,PKEY_ItemTypeText,PKEY_ItemPathDisplay,PKEY_DateModified,PKEY_Comment,
+        PKEY_FileExtension,PKEY_KindText,PKEY_ItemDate};
     *key=keys[column];
     return S_OK;
 }
@@ -481,17 +540,19 @@ HRESULT ShellFolder::CallBack(IShellFolder*,HWND owner,IDataObject*,UINT message
             auto* menu=reinterpret_cast<QCMINFO*>(second);
             if(!menu) return E_POINTER;
             if(first & CMF_DEFAULTONLY) return S_OK;
-            for(UINT label:{IDS_ADD_FOLDER,IDS_ADD_APP,IDS_ADD_FILE,IDS_MANAGE,IDS_RECENT_FILTERS,IDS_RECENT_SHOW,IDS_RECENT_RESTORE})
+            for(UINT label:{IDS_ADD_FOLDER,IDS_ADD_APP,IDS_ADD_FILE,IDS_MANAGE,IDS_RECENT_FILTERS,IDS_RECENT_SHOW,IDS_RECENT_RESTORE,
+                IDS_VIEW_OPTIONS,IDS_CLEAR_SEARCH})
             {
                 if(menu->idCmdFirst>menu->idCmdLast) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
                 const UINT flags=MF_BYPOSITION|MF_STRING|
-                    (label==IDS_RECENT_SHOW && recent_settings().enabled ? MF_CHECKED : 0);
+                    (label==IDS_RECENT_SHOW && recent_settings().enabled ? MF_CHECKED : 0)|
+                    (label==IDS_CLEAR_SEARCH && view_settings().query.empty() ? MF_GRAYED : 0);
                 const UINT command=menu->idCmdFirst++;
                 check_win32(InsertMenuW(menu->hmenu,menu->indexMenu++,flags,command,text(label).c_str()));
                 const MenuGlyph glyph=label==IDS_ADD_FOLDER ? MenuGlyph::folder :
                     label==IDS_ADD_APP ? MenuGlyph::apps : label==IDS_ADD_FILE ? MenuGlyph::document :
                     label==IDS_MANAGE ? MenuGlyph::folder_open : label==IDS_RECENT_FILTERS ? MenuGlyph::filter :
-                    label==IDS_RECENT_SHOW ? MenuGlyph::history : MenuGlyph::restore;
+                    label==IDS_RECENT_SHOW ? MenuGlyph::history : label==IDS_VIEW_OPTIONS ? MenuGlyph::search : MenuGlyph::restore;
                 menu_icons_.attach(menu->hmenu,command,glyph,owner);
             }
             return S_OK;
@@ -510,12 +571,20 @@ HRESULT ShellFolder::CallBack(IShellFolder*,HWND owner,IDataObject*,UINT message
             if(first==5)
             { auto settings=recent_settings(); settings.enabled=!settings.enabled; save_recent_settings(settings); return S_OK; }
             if(first==6) { restore_hidden_recents(); return S_OK; }
+            if(first==7 || first==8)
+            {
+                auto settings=view_settings(); auto view=active_view(owner,root_.get());
+                if(first==7) { if(!choose_view_settings(owner,settings)) return S_OK; }
+                else settings.query.clear();
+                save_view_settings(settings); apply_view(view.Get(),settings); return S_OK;
+            }
             return S_FALSE;
         }
         return E_NOTIMPL;
     });
     if(FAILED(status) && (message==DFM_INVOKECOMMAND || message==DFM_INVOKECOMMANDEX))
-        report_error(owner,status,first>=4 && first<=6 ? IDS_ERROR_RECENTS : IDS_ERROR_ADD);
+        report_error(owner,status,first==7 || first==8 ? IDS_ERROR_VIEW :
+            first>=4 && first<=6 ? IDS_ERROR_RECENTS : IDS_ERROR_ADD);
     return status;
 }
 HRESULT ShellFolder::DragEnter(IDataObject* data,DWORD,POINTL,DWORD* effect) noexcept
@@ -552,10 +621,11 @@ HRESULT ShellFolder::GetColumnPropertyList(REFIID iid,void** result) noexcept
     *result=nullptr;
     // The '0' proplist flag makes each column visible by default. An unflagged
     // entry is available to the property system but hidden in DefView's UI.
-    return PSGetPropertyDescriptionListFromString(L"prop:0System.ItemNameDisplay;0System.ItemTypeText;0System.ItemPathDisplay;0System.DateModified;0System.Comment",iid,result);
+    return PSGetPropertyDescriptionListFromString(L"prop:0System.ItemNameDisplay;0System.ItemTypeText;0System.ItemPathDisplay;0System.DateModified;0System.Comment;System.FileExtension;System.KindText;System.ItemDate",iid,result);
 }
 HRESULT ShellFolder::GetGroupByProperty(PROPERTYKEY* key,BOOL* ascending) noexcept
-{ if(!key || !ascending) return E_POINTER; *key=PKEY_ItemTypeText; *ascending=TRUE; return S_OK; }
+{ if(!key || !ascending) return E_POINTER;
+  return guarded([&]{*key=group_key(view_settings().grouping); *ascending=TRUE; return S_OK;}); }
 HRESULT ShellFolder::GetViewMode(FOLDERLOGICALVIEWMODE* mode) noexcept
 { if(!mode) return E_POINTER; *mode=FLVM_ICONS; return S_OK; }
 HRESULT ShellFolder::GetIconSize(UINT* size) noexcept
@@ -567,9 +637,13 @@ HRESULT ShellFolder::GetSortColumns(SORTCOLUMN* columns,UINT capacity,UINT* coun
     if(!count) return E_POINTER;
     *count=0;
     if(!columns || !capacity) return E_INVALIDARG;
-    columns[0]={PKEY_DateModified,SORT_DESCENDING}; *count=1;
-    if(capacity>1) { columns[1]={PKEY_ItemNameDisplay,SORT_ASCENDING}; *count=2; }
-    return S_OK;
+    return guarded([&]{
+        const auto settings=view_settings();
+        columns[0]={settings.order==ItemOrder::name ? PKEY_ItemNameDisplay : PKEY_ItemDate,
+            settings.descending ? SORT_DESCENDING : SORT_ASCENDING}; *count=1;
+        if(capacity>1 && settings.order==ItemOrder::date) { columns[1]={PKEY_ItemNameDisplay,SORT_ASCENDING}; *count=2; }
+        return S_OK;
+    });
 }
 HRESULT ShellFolder::GetGroupSubsetCount(UINT* count) noexcept
 { if(!count) return E_POINTER; *count=0; return E_NOTIMPL; }

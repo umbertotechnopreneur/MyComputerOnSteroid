@@ -3,6 +3,21 @@
 Delivered implementation records belong here. Keep remaining verification in
 [todo.md](todo.md), with detailed evidence in [validation](../../docs/VALIDATION.md).
 
+## 2026-10-11 - MCS-080: searchable collection and extension families
+
+- Added native section/extension/editable-family grouping, name/date ordering in
+  either direction, and optional extension/family/item-date columns.
+- Added name/target-path/exact-extension search over launcher references and
+  enabled recents, with safe clear/no-match behavior and atomic user preferences.
+- Polished the Win32 options dialog with right-aligned labels, group boxes,
+  shorter date text and colored Windows stock icons.
+- Passed final isolated x64 Debug/Release tests, both architecture builds and
+  both native MSI ICE checks. Installed and visually checked the x64 payload in
+  Explorer, including custom family rendering, search and active-view ordering.
+- Restored prior private preferences after UI experiments. No target or history
+  mutation was needed. Broader themes/DPI/accessibility, compact-menu deletion,
+  clean installer lifecycle and ARM64 runtime remain open in MCS-060/070.
+
 ## 2026-10-11 - MCS-001: repository and native provider bootstrap
 
 - Published the public MyComputerOnSteroid repository under Umberto Giacobbi's

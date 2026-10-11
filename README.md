@@ -34,11 +34,49 @@ The 0.0.0 MSI is a development package; no application release is published.
   picker. The selected icon file is referenced at its existing path.
 - Optional recent documents with filters, a typed date column, bulk pin/unpin,
   hide, restore-hidden and promotion to favorites.
+- Search launcher references by name, target path or exact extension; group by
+  section, extension or editable extension families, and order by name or date.
 
 Right-click empty space and use Show more options for Add favorite folder/app/file,
 Manage favorite shortcuts, Show recent items, Filter recent items and Restore
 hidden recent items. Select favorite references for Change launcher icon.
 Recent-item commands act on the complete selected set.
+
+## Search and organize
+
+Right-click empty space, choose **Show more options**, then **Search and organize**.
+The native Win32 dialog has right-aligned labels, separate search/view/family
+sections and small Windows stock icons. Item icons still follow Windows file
+associations; no external icon pack or global association change is included.
+
+Search applies to launcher references and enabled recent items, not directory
+contents. Name uses the launcher alias; Path uses the shortcut's target. Both are
+case-insensitive substring searches. Extension matches exactly: pdf and .PDF
+both match PDF files. The combined choice searches name and target path, including
+its suffix. **Apply** persists changes; **Cancel** leaves preferences untouched.
+**Clear launcher search** in the background menu restores the full collection.
+This is separate from Explorer's upper-right search box.
+
+Choose sections, file extensions, extension families or no grouping. Family
+definitions use one line per group, for example:
+
+~~~text
+Documents = pdf, docx, xlsx, md
+Development = c, cpp, h, hpp, css, html, js, ts
+Audio = mp3, wav, flac
+~~~
+
+Each extension belongs to one family. Invalid or duplicate assignments are
+rejected before saving. Unassigned suffixes use Other extensions; drives and
+folders retain their own groups when grouping is enabled. Groups use native
+Shell collapsing and alphabetical order; there is no manual item ordering.
+
+Order items by Name or Item date, ascending or descending. Item date means local
+target modification time for favorites and history-entry update time for recent
+items. Drives, unavailable dates and network-target dates stay empty. Details
+offers optional Extension, Extension family and Item date columns in addition to
+the original five. Apply updates the current view; Explorer can retain its own
+view preferences in other windows. Search/family preferences are shared per user.
 
 ## Recent items
 

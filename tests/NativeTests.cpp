@@ -14,8 +14,10 @@
 
 #include "../src/core/Catalog.hpp"
 #include "../src/core/Recents.hpp"
+#include "../src/core/ViewSettings.hpp"
 #include "../src/shell/ItemId.hpp"
 #include "../src/ProjectIdentity.hpp"
+#include "../resources/resource.h"
 #include <Propkey.h>
 #include <Propsys.h>
 #include <fstream>
@@ -285,6 +287,99 @@ void recent_tests(const std::filesystem::path& fixture,IShellFolder2* shell)
     settings.enabled=false; save_recent_settings(settings);
     require(enumerate_recents().empty(),"recent section can be turned off independently of favorites");
 }
+
+void collection_view_tests(const std::filesystem::path& fixture,IShellFolder2* shell)
+{
+    const auto original_settings=view_settings();
+    const auto first_path=fixture/L"Alpha.PDF",second_path=fixture/L"Beta.docx";
+    std::ofstream(first_path)<<"PDF fixture original";
+    std::ofstream(second_path)<<"Office fixture original";
+    const auto first_link=add_favorite(shell_item(parse_pidl(first_path.wstring()).get()).Get(),Section::files,L"Alias senza suffisso");
+    const auto second_link=add_favorite(shell_item(parse_pidl(second_path.wstring()).get()).Get(),Section::files,L"Zeta reference");
+    CatalogItem first{Section::files,first_link.wstring()},second{Section::files,second_link.wstring()};
+    auto first_id=shell::make_item_id(first),second_id=shell::make_item_id(second);
+    PCUITEMID_CHILD selection[]{first_id.get(),second_id.get()};
+    auto settings=original_settings;
+    settings.families=L"Contratti = .PDF, .docx\r\nSviluppo = cpp; h; md";
+    const auto families=parse_families(settings.families);
+    require(item_extension(first)==L".pdf","extensions use target suffix, not renamed favorite alias or .lnk");
+    require(item_family(first,families)==L"Contratti" && item_family(second,families)==L"Contratti",
+        "custom family combines different target extensions, including mixed case");
+    require(item_family({Section::folders,first.path},families)==text(IDS_FOLDERS),"folder names are not treated as file extensions");
+    settings.field=SearchField::name; settings.query=L"ALIAS";
+    require(matches_search(first,settings) && !matches_search(second,settings),"name search is case-insensitive and honors launcher aliases");
+    settings.query=L"Alpha";
+    require(!matches_search(first,settings),"name-only search does not accidentally search the target path");
+    settings.field=SearchField::path;
+    require(matches_search(first,settings) && !matches_search(second,settings),"path search uses the target, not the stored shortcut filename");
+    settings.field=SearchField::extension; settings.query=L"PDF";
+    require(matches_search(first,settings) && !matches_search(second,settings),"extension search normalizes dot and case and matches exactly");
+    settings.query=L"pd"; require(!matches_search(first,settings),"extension search does not match a partial suffix");
+    settings.field=SearchField::any; settings.query=L".pdf";
+    require(matches_search(first,settings),"combined search finds target extensions when the alias omits them");
+    settings.query=L""; require(matches_search(first,settings),"clearing search restores a previously filtered reference");
+    settings.grouping=GroupMode::families; settings.order=ItemOrder::name; settings.descending=false;
+    settings.query=L"Contrattò_日本語";
+    save_view_settings(settings);
+    const auto loaded=view_settings();
+    require(loaded.query==settings.query && loaded.families==settings.families && loaded.grouping==GroupMode::families && !loaded.descending,
+        "atomic Unicode settings preserve custom families, grouping and order");
+    auto invalid=settings; invalid.families=L"One = pdf\nTwo = .PDF";
+    require(guarded([&]{save_view_settings(invalid); return S_OK;})==E_INVALIDARG && view_settings().families==settings.families,
+        "duplicate extensions are rejected without replacing the last valid settings");
+    for(const auto bad:{L"No equals sign",L"Empty =",L"Unsafe = ../pdf",L"One = pdf\nOne = docx"})
+        require(guarded([&]{parse_families(bad); return S_OK;})==E_INVALIDARG,"malformed/ambiguous family definitions are rejected");
+
+    ComPtr<ICategoryProvider> provider; check(shell->CreateViewObject(nullptr,IID_PPV_ARGS(&provider)));
+    GUID category{}; check(provider->GetCategoryForSCID(&PKEY_KindText,&category));
+    ComPtr<ICategorizer> categorizer; check(provider->CreateCategory(&category,IID_PPV_ARGS(&categorizer)));
+    DWORD groups[2]{}; check(categorizer->GetCategory(2,selection,groups));
+    CATEGORY_INFO info{}; check(categorizer->GetCategoryInfo(groups[0],&info));
+    require(groups[0]==groups[1] && wcscmp(info.wszName,L"Contratti")==0,"Shell family categorizer exposes one real group across extensions");
+    settings.families=L"Documenti = pdf, docx"; save_view_settings(settings);
+    check(categorizer->GetCategory(2,selection,groups)); check(categorizer->GetCategoryInfo(groups[0],&info));
+    require(wcscmp(info.wszName,L"Documenti")==0,"an existing Shell categorizer picks up edited family definitions");
+    check(provider->GetCategoryForSCID(&PKEY_FileExtension,&category)); categorizer.Reset();
+    check(provider->CreateCategory(&category,IID_PPV_ARGS(&categorizer)));
+    check(categorizer->GetCategory(2,selection,groups)); check(categorizer->GetCategoryInfo(groups[0],&info));
+    require(groups[0]!=groups[1] && wcscmp(info.wszName,L".pdf")==0,"Shell extension grouping separates actual target suffixes");
+    ComPtr<IFolderViewSettings> defaults; check(shell->QueryInterface(IID_PPV_ARGS(&defaults)));
+    SORTCOLUMN sort[2]{}; UINT sorts{}; check(defaults->GetSortColumns(sort,2,&sorts));
+    require(sorts==1 && IsEqualPropertyKey(sort[0].propkey,PKEY_ItemNameDisplay) && sort[0].direction==SORT_ASCENDING,
+        "name ordering is independent from family grouping");
+    settings.query=L"pdf"; settings.field=SearchField::extension; save_view_settings(settings);
+    ComPtr<IEnumIDList> filtered; check(shell->EnumObjects(nullptr,SHCONTF_FOLDERS|SHCONTF_NONFOLDERS,&filtered));
+    PITEMID_CHILD raw{}; ULONG fetched{}; unsigned found{};
+    while(filtered->Next(1,&raw,&fetched)==S_OK)
+    { Pidl id(raw); require(item_extension(shell::read_item_id(raw))==L".pdf","Shell enumeration filters every section by target extension"); ++found; }
+    require(found>0,"filtered enumeration retains matching launcher references");
+    settings.query=L"impossible-unique-fixture-search"; save_view_settings(settings);
+    filtered.Reset(); check(shell->EnumObjects(nullptr,SHCONTF_FOLDERS|SHCONTF_NONFOLDERS,&filtered));
+    require(filtered->Next(1,&raw,&fetched)==S_FALSE && fetched==0,"a no-match search safely returns an empty Shell collection");
+
+    const auto set_date=[](const std::filesystem::path& path,WORD year){
+        HANDLE file=CreateFileW(path.c_str(),FILE_WRITE_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,0,nullptr);
+        check_win32(file!=INVALID_HANDLE_VALUE);
+        SYSTEMTIME system{}; system.wYear=year; system.wMonth=1; system.wDay=1; FILETIME time{};
+        const BOOL converted=SystemTimeToFileTime(&system,&time); const BOOL saved=converted && SetFileTime(file,nullptr,nullptr,&time);
+        const auto error=GetLastError(); CloseHandle(file); if(!saved) check(HRESULT_FROM_WIN32(error));
+    };
+    set_date(first_path,2020); set_date(second_path,2026);
+    VARIANT date{}; check(shell->GetDetailsEx(first_id.get(),&PKEY_ItemDate,&date));
+    require(date.vt==VT_DATE,"favorite item date is a typed target modification date"); VariantClear(&date);
+    require(static_cast<short>(HRESULT_CODE(shell->CompareIDs(7,first_id.get(),second_id.get())))<0,
+        "date comparison is chronological rather than formatted-text ordering");
+    settings.query.clear(); settings.order=ItemOrder::date; settings.descending=true; save_view_settings(settings);
+    check(defaults->GetSortColumns(sort,2,&sorts));
+    require(sorts==2 && IsEqualPropertyKey(sort[0].propkey,PKEY_ItemDate) && sort[0].direction==SORT_DESCENDING &&
+        IsEqualPropertyKey(sort[1].propkey,PKEY_ItemNameDisplay),"date ordering has a stable name tie-breaker");
+    require(contents(first_path)=="PDF fixture original" && contents(second_path)=="Office fixture original",
+        "search, grouping and settings preserve every original file's bytes");
+    std::ofstream(data_root()/L"view.ini",std::ios::binary)<<"Interrupted/corrupt preference fixture";
+    require(view_settings().query.empty() && view_settings().grouping==GroupMode::sections,
+        "a corrupt optional settings file falls back to an unfiltered collection");
+    remove_favorite(first); remove_favorite(second); save_view_settings(original_settings);
+}
 }
 
 int wmain(int count,wchar_t** arguments)
@@ -398,12 +493,12 @@ int wmain(int count,wchar_t** arguments)
             ComPtr<IFolderViewSettings> defaults; check(shell.As(&defaults));
             ComPtr<IPropertyDescriptionList> column_list; check(defaults->GetColumnPropertyList(IID_PPV_ARGS(&column_list)));
             UINT columns{}; check(column_list->GetCount(&columns));
-            require(columns==5,"native details view exposes all five launcher columns");
+            require(columns==8,"native details view offers extension, family and item-date columns");
             for(UINT index=0;index<columns;++index)
             {
                 ComPtr<IPropertyDescription> description; check(column_list->GetAt(index,IID_PPV_ARGS(&description)));
                 PROPDESC_VIEW_FLAGS view_flags{}; check(description->GetViewFlags(&view_flags));
-                require((view_flags & PDVF_SHOWBYDEFAULT)!=0,"launcher detail columns are visible by default");
+                require(((view_flags & PDVF_SHOWBYDEFAULT)!=0)==(index<5),"original columns remain default, organization columns are available");
             }
             ComPtr<ICategorizer> categorizer;
             check(categories->CreateCategory(&group,IID_PPV_ARGS(&categorizer)));
@@ -468,6 +563,7 @@ int wmain(int count,wchar_t** arguments)
             check(shell->GetUIObjectOf(nullptr,1,&icon_selected,IID_IContextMenu,nullptr,reinterpret_cast<void**>(icon_menu.GetAddressOf())));
             require(menu_command(icon_menu.Get(),L"mcos.change-icon")!=0,"native favorite menu exposes Change launcher icon");
             recent_tests(fixture,shell.Get());
+            collection_view_tests(fixture,shell.Get());
         }
         require(can_unload()==S_OK,"COM objects release and DLL can unload");
 
