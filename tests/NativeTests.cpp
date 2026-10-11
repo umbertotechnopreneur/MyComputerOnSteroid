@@ -63,6 +63,28 @@ void verify_launcher_icons(HMENU popup,IContextMenu* menu)
         if(FAILED(menu->GetCommandString(command-1,GCS_VERBW,nullptr,reinterpret_cast<LPSTR>(verb),ARRAYSIZE(verb))) ||
             wcsncmp(verb,L"mcos.",5)!=0) continue;
         MENUITEMINFOW item{sizeof(item)}; item.fMask=MIIM_BITMAP;
+        if(!GetMenuItemInfoW(popup,command,FALSE,&item) || !item.hbmpItem)
+        {
+            std::wcerr<<L"Missing native menu bitmap for "<<verb<<L" at position "<<index<<L"\n";
+            HDC dc=CreateCompatibleDC(nullptr);
+            if(dc)
+            {
+                for(PCWSTR face:{L"Segoe Fluent Icons",L"Segoe MDL2 Assets"})
+                {
+                    HFONT font=CreateFontW(-16,0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
+                        OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,face);
+                    if(!font) continue;
+                    HGDIOBJ previous=SelectObject(dc,font); wchar_t actual[LF_FACESIZE]{};
+                    const wchar_t characters[]{0xed1a,0xe733}; WORD glyphs[]{0xffff,0xffff};
+                    GetTextFaceW(dc,ARRAYSIZE(actual),actual);
+                    GetGlyphIndicesW(dc,characters,2,glyphs,GGI_MARK_NONEXISTING_GLYPHS);
+                    std::wcerr<<L"Font "<<face<<L" maps to "<<actual<<L"; Hide/Blocked indices "
+                        <<std::hex<<glyphs[0]<<L"/"<<glyphs[1]<<std::dec<<L"\n";
+                    SelectObject(dc,previous); DeleteObject(font);
+                }
+                DeleteDC(dc);
+            }
+        }
         require(GetMenuItemInfoW(popup,command,FALSE,&item) && item.hbmpItem,"launcher commands have native menu bitmaps");
         DIBSECTION image{};
         require(GetObjectW(item.hbmpItem,sizeof(image),&image)==sizeof(image) && image.dsBm.bmBits &&

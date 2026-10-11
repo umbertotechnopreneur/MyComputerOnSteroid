@@ -18,8 +18,8 @@
 
 namespace mcos
 {
-// Public system-font code points. The older MDL2 font lacks the Hide glyph;
-// it uses its Blocked symbol as the compatibility fallback.
+// Public system-font code points. Older versions may lack the Hide glyph;
+// the Blocked symbol is tried only when Hide cannot render.
 enum class MenuGlyph : wchar_t
 {
     favorite = 0xe734, pin = 0xe718, unpin = 0xe77a, hide = 0xed1a, blocked = 0xe733,

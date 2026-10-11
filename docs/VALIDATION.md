@@ -102,8 +102,8 @@ source/security/accessibility review. The owner deferred further recent-manageme
 UX work. Background/acrylic, its photo control and export/import were cancelled.
 
 The current workflow adds isolated x64 tests to Debug x64/ARM64 compilation.
-Its first x64 run exposed a missing Hide glyph in the runner's older MDL2 font;
-the compatibility renderer now uses that font's Blocked symbol for Hide. The
+Its first x64 run exposed an absent Hide bitmap with the runner's icon fonts;
+the compatibility renderer tries the Blocked symbol in either font if needed. The
 Windows 11 Fluent rendering observed above retains the eye-with-slash glyph.
 Required PR checks remain **Debug x64** and **Debug arm64**. Current remote
 source-delivery evidence is in the repository's PR checks and

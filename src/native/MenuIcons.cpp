@@ -69,11 +69,6 @@ MenuBitmap render(MenuGlyph glyph, int pixels, COLORREF color) noexcept
 
     for (PCWSTR face : {L"Segoe Fluent Icons", L"Segoe MDL2 Assets"})
     {
-        // Windows Server CI and older system fonts do not have Fluent Hide.
-        // Preserve a visible native symbol without weakening the menu tests.
-        const auto compatible = glyph == MenuGlyph::hide && _wcsicmp(face, L"Segoe MDL2 Assets") == 0
-            ? MenuGlyph::blocked : glyph;
-        const wchar_t character = static_cast<wchar_t>(compatible);
         std::unique_ptr<void, DeleteFont> font(CreateFontW(-pixels, 0, 0, 0, FW_NORMAL,
             FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
             ANTIALIASED_QUALITY, DEFAULT_PITCH, face));
@@ -81,30 +76,37 @@ MenuBitmap render(MenuGlyph glyph, int pixels, COLORREF color) noexcept
         SelectObjectBack restore_font{dc.get(), SelectObject(dc.get(), font.get())};
         if (!restore_font.previous || restore_font.previous == HGDI_ERROR) continue;
         wchar_t actual_face[LF_FACESIZE]{};
-        WORD glyph_index = 0xffff;
-        if (!GetTextFaceW(dc.get(), ARRAYSIZE(actual_face), actual_face) || _wcsicmp(actual_face, face) != 0 ||
-            GetGlyphIndicesW(dc.get(), &character, 1, &glyph_index, GGI_MARK_NONEXISTING_GLYPHS) == GDI_ERROR ||
-            glyph_index == 0xffff) continue;
-
-        auto* bits = static_cast<std::uint32_t*>(raw);
-        std::fill_n(bits, pixels * pixels, 0x00ffffffu);
-        SetBkMode(dc.get(), TRANSPARENT);
-        SetTextColor(dc.get(), RGB(0, 0, 0));
-        RECT rectangle{0, 0, pixels, pixels};
-        if (!DrawTextW(dc.get(), &character, 1, &rectangle, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX)) continue;
-        GdiFlush();
-        // GDI text supplies a grayscale coverage mask. Native menus consume a
-        // top-down 32-bit DIB with premultiplied alpha, including hover states.
-        bool visible = false;
-        for (int i = 0; i < pixels * pixels; ++i)
+        if (!GetTextFaceW(dc.get(), ARRAYSIZE(actual_face), actual_face) || _wcsicmp(actual_face, face) != 0) continue;
+        // Font family presence does not guarantee a particular glyph/version.
+        // Try the compatible symbol in either font only if Hide cannot render.
+        const MenuGlyph candidates[]{glyph, MenuGlyph::blocked};
+        const UINT count = glyph == MenuGlyph::hide ? 2u : 1u;
+        for (UINT candidate = 0; candidate < count; ++candidate)
         {
-            const auto gray = ((bits[i] & 0xff) + ((bits[i] >> 8) & 0xff) + ((bits[i] >> 16) & 0xff)) / 3;
-            const auto alpha = 255 - gray;
-            visible = visible || alpha != 0;
-            bits[i] = (alpha << 24) | ((GetRValue(color) * alpha / 255) << 16) |
-                ((GetGValue(color) * alpha / 255) << 8) | (GetBValue(color) * alpha / 255);
+            const wchar_t character = static_cast<wchar_t>(candidates[candidate]);
+            WORD glyph_index = 0xffff;
+            if (GetGlyphIndicesW(dc.get(), &character, 1, &glyph_index, GGI_MARK_NONEXISTING_GLYPHS) == GDI_ERROR ||
+                glyph_index == 0xffff) continue;
+            auto* bits = static_cast<std::uint32_t*>(raw);
+            std::fill_n(bits, pixels * pixels, 0x00ffffffu);
+            SetBkMode(dc.get(), TRANSPARENT);
+            SetTextColor(dc.get(), RGB(0, 0, 0));
+            RECT rectangle{0, 0, pixels, pixels};
+            if (!DrawTextW(dc.get(), &character, 1, &rectangle, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX)) continue;
+            GdiFlush();
+            // GDI text supplies a grayscale coverage mask. Native menus consume a
+            // top-down 32-bit DIB with premultiplied alpha, including hover states.
+            bool visible = false;
+            for (int i = 0; i < pixels * pixels; ++i)
+            {
+                const auto gray = ((bits[i] & 0xff) + ((bits[i] >> 8) & 0xff) + ((bits[i] >> 16) & 0xff)) / 3;
+                const auto alpha = 255 - gray;
+                visible = visible || alpha != 0;
+                bits[i] = (alpha << 24) | ((GetRValue(color) * alpha / 255) << 16) |
+                    ((GetGValue(color) * alpha / 255) << 8) | (GetBValue(color) * alpha / 255);
+            }
+            if (visible) return bitmap;
         }
-        if (visible) return bitmap;
     }
     return {};
 }

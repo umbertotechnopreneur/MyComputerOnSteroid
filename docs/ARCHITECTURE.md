@@ -57,7 +57,8 @@ owner's DPI. Colors follow the Windows app light/dark preference or system menu
 text in high contrast. The menu object retains bitmap ownership, including older
 DPI/theme variants. Missing fonts or decoration failure leave the text commands
 available. No owner-drawn replacement or private Explorer theming API is used.
-The older MDL2 font lacks Fluent Hide, so that fallback uses its Blocked symbol.
+Font versions can differ even within a family. If Hide cannot render, try the
+compatible Blocked symbol in either installed icon font.
 
 References supply their name aliases, content/tile property lists and the
 documented content layout through GetDetailsEx. Launcher items decline target
