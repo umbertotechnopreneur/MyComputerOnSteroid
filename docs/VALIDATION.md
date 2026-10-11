@@ -81,8 +81,9 @@ REINSTALLMODE=vamus to recache the freshly authored MSI. Exit 3010 requested an
 OS reboot for pending old-file cleanup. An authorized Explorer restart loaded the
 new DLL; no OS reboot was forced. A subsequent repair after the session resumed
 installed the font-compatibility update with exit 0, while the provider was
-unloaded. The final installed/tested DLL SHA-256 was
-`AA493D01565EBE468DA416E1FB8B00999EE8C7AE5FB0D6EB01AFA41163DC7A71`.
+unloaded. The final repair, including the older-font Remove fallback, returned
+3010; its installed DLL matched the tested Release build, SHA-256
+`2F95ECA7D719160E6F4E37ED1D20F89E30E0209920CFB5ED0EF5878FDF603DFE`.
 
 An old per-user development registration remains on this workstation. Its cleanup
 was rejected by automatic approval review and was not bypassed. Actual Explorer
@@ -107,7 +108,9 @@ Diagnostic output confirmed Fluent font substitution and a missing Hide glyph in
 MDL2. The renderer tries the documented Remove symbol in either font if needed. The
 Windows 11 Fluent rendering observed above retains the eye-with-slash glyph.
 Required PR checks remain **Debug x64** and **Debug arm64**. Current remote
-source-delivery evidence is in the repository's PR checks and
+Debug x64 tests and both architecture builds passed in
+[run 38151458395](https://github.com/umbertotechnopreneur/MyComputerOnSteroid/actions/runs/38151458395).
+Source-delivery evidence is in the repository's PR checks and
 [GitHub Actions](https://github.com/umbertotechnopreneur/MyComputerOnSteroid/actions);
 the fixed historical run below proves the bootstrap only.
 
