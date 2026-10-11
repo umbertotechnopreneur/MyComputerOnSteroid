@@ -1,0 +1,23 @@
+# Build, machine state and local data
+/artifacts/
+/out/
+/build/
+/.vs/
+/.vscode/
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+*.user
+*.suo
+*.pdb
+*.ilk
+*.obj
+*.log
+*.lnk
+*.library-ms
+*.pfx
+*.key
+.env
+.env.*
+desktop.ini
+Thumbs.db

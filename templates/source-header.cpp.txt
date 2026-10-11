@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: MIT
+/* VBWR B
+ * Project: MyComputerOnSteroid
+ * Repository: https://github.com/umbertotechnopreneur/MyComputerOnSteroid
+ * Creator: Umberto Giacobbi | https://umbertogiacobbi.biz
+ * VibeWare participation: Human intent, AI execution, and plenty of tokens
+ * Manifesto: https://umbertogiacobbi.biz/vibeware/manifesto
+ * Created with AI: [Actual tool, contribution and date; omit if inapplicable]
+ * Modified with AI: [Actual tool, change and date; omit if inapplicable]
+ * Human guidance: [Actual direction; do not imply unperformed review]
+ * Evidence: [Applicable commit, PR or validation record]
+ * Copyright (c) [Year] Umberto Giacobbi
+ * License: MIT
+ * VBWR E */

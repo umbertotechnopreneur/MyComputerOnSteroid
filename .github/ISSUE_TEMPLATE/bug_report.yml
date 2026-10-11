@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible problem with the current source.
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Commit, Windows build, x64 or ARM64, and Visual Studio version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected result
+      description: Include exact commands and synthetic file names. Remove personal paths and secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include the relevant error. A successful build is separate from installed Explorer behavior.
+    validations:
+      required: true
