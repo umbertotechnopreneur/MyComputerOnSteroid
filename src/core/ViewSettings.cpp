@@ -166,6 +166,7 @@ std::wstring item_family(const CatalogItem& item,const std::vector<ExtensionFami
 {
     if(item.section==Section::drives) return text(IDS_DRIVES);
     if(item.section==Section::folders) return text(IDS_FOLDERS);
+    if(item.section==Section::apps) return text(IDS_APPS);
     const auto extension=item_extension(item);
     for(const auto& family:families)
         if(std::find(family.extensions.begin(),family.extensions.end(),extension)!=family.extensions.end()) return family.name;

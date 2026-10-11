@@ -37,6 +37,7 @@ add_library(MyComputerOnSteroid.Shell SHARED
     src/native/ViewDialog.cpp
     src/native/MenuIcons.cpp
     src/shell/ItemId.cpp
+    src/shell/TransferData.cpp
     src/shell/Grouping.cpp
     src/shell/FavoriteMenu.cpp
     src/shell/MyComputerOnSteroid.def

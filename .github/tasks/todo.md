@@ -6,6 +6,9 @@ delivery. Keep remaining validation open.
 
 ## MCS-060 - Complete Explorer interaction acceptance
 
+- [ ] Verify document drag into GPT and other file receivers with a disposable
+  file, plus desktop drop. Native transfer tests and actual Explorer IDataObject
+  checks pass; receiving-application acceptance is still separate evidence.
 - [ ] Resolve and verify persistent removal through Windows 11's compact Delete
   command. An earlier UI experiment removed a row but left its owned link in place.
   Require removal after reopening, target preservation and drive protection.

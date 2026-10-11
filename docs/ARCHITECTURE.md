@@ -16,6 +16,7 @@ normal sorting. The visible name is **My Computer Enhanced**.
 | native/ViewDialog | Standard Win32 search/group/order dialog and OS stock icon lifetime |
 | native/MenuIcons | DPI-sized, theme-aware glyph bitmaps owned for native menu lifetime |
 | shell/ItemId | Validated child PIDLs and delegation to real Shell items |
+| shell/TransferData | Reference Shell identity with document target file-transfer formats |
 | shell/Grouping | Section, extension and editable family category providers |
 | shell/FavoriteMenu | Native menu delegation, reference-only mutations and added commands |
 | shell/ShellFolder | Enumeration, properties, DefView, grouping, menus and drop |
@@ -39,6 +40,13 @@ Individual favorites do not need CLSIDs. Stable sections are Folders 1, Drives 2
 Apps 3, Files 4, Recent items 5. A category provider supplies groups; empty groups
 are omitted. Shell group collapsing, view modes and sorting remain native.
 No manual item ordering is implemented.
+
+Category comparison uses presentation ranks instead of numeric section IDs:
+Drives, Folders, Apps, Files, Recent items. In family mode Office, PDF and
+Development/Sviluppo precede other naturally sorted families. Other extensions
+and files without an extension are last. Apps stay one section in both dynamic
+grouping modes. Group IDs retain their previous meanings. Item name/date order
+does not change these ranks; Explorer's descending group choice can reverse them.
 
 The original visible columns are Name, Section, Location, Recent entry updated
 and Pinned in recent items. Extension, Extension family and Item date are optional
@@ -65,7 +73,7 @@ IShellFolder2/IFolderViewSettings expose the new properties and ordering default
 ICategoryProvider supplies separate categorizer identities for sections, target
 extensions and editable families. Drives and folders keep their section groups;
 other items use target suffixes rather than .lnk or renamed aliases. Dynamic
-category names are sorted with StrCmpLogicalW. A categorizer reads current family
+category names at the same presentation rank use StrCmpLogicalW. A categorizer reads current family
 definitions per batch so edits do not leave stale classification.
 
 The native background command obtains the owner's active view through public
@@ -177,6 +185,22 @@ a Windows 11 popup. Actual host/build observations are in [validation](VALIDATIO
 Drop binds a valid Shell item array/data object, including selections from
 different parents. It negotiates link, or copy if link is unavailable, never move.
 Only references are created. Partial failures preserve references already added.
+
+Outgoing document transfers wrap two standard Shell data objects. CF_HDROP,
+FileName and descriptor/content formats come from the real filesystem document
+targets for Files and Recent items. Folder/app selections retain their references
+in those formats. CFSTR_SHELLIDLIST and other Shell identity formats continue to
+come from the owned links, so Shell reference operations do not acquire document
+identities. Each format is routed consistently in GetData, QueryGetData and
+enumeration; unavailable target formats never fall back to hashed cache links.
+Mixed-parent selections use IShellItemArray rather than invalid relative PIDLs.
+
+The export advertises Preferred DropEffect COPY and clears SFGAO_CANMOVE at the
+source. Destination SetData feedback is retained by the reference object, never
+forwarded to the target object. The adapter exposes only its own IDataObject COM
+identity and adds no document deletion. Missing/non-filesystem document targets
+report failure. These are source-side policies, not control over arbitrary actions
+performed by a receiving application after it obtains filesystem paths.
 
 ## Installation and boundaries
 

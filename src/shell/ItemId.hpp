@@ -20,4 +20,7 @@ namespace mcos::shell
 Pidl make_item_id(const CatalogItem& item);
 CatalogItem read_item_id(PCUIDLIST_RELATIVE pidl);
 HRESULT native_ui_object(HWND owner, UINT count, PCUITEMID_CHILD_ARRAY items, REFIID iid, void** result);
+// Shell identities retain owned references; file-transfer formats expose document
+// targets for receivers that do not understand Shell links (for example uploads).
+HRESULT transfer_data_object(UINT count, PCUITEMID_CHILD_ARRAY items, IDataObject** result) noexcept;
 }

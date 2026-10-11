@@ -323,7 +323,9 @@ HRESULT ShellFolder::GetAttributesOf(UINT count,PCUITEMID_CHILD_ARRAY items,SFGA
                 if(item.section==Section::recents) flags &= ~SFGAO_CANRENAME;
                 else flags |= SFGAO_CANRENAME;
             }
-            flags &= ~SFGAO_DROPTARGET;
+            // Exported document paths are offered for copying, never moving
+            // originals out of the launcher. Native mutations still use links.
+            flags &= ~(SFGAO_DROPTARGET|SFGAO_CANMOVE);
             if(item.section==Section::folders || item.section==Section::drives)
                 flags |= SFGAO_FOLDER|SFGAO_BROWSABLE|SFGAO_HASSUBFOLDER;
             else flags &= ~(SFGAO_FOLDER|SFGAO_HASSUBFOLDER);
@@ -338,6 +340,8 @@ HRESULT ShellFolder::GetUIObjectOf(HWND owner,UINT count,PCUITEMID_CHILD_ARRAY i
     *result=nullptr;
     return guarded([&]{
         if(!count || !items) return E_INVALIDARG;
+        if(iid==IID_IDataObject)
+            return transfer_data_object(count,items,reinterpret_cast<IDataObject**>(result));
         if(iid==IID_IContextMenu || iid==IID_IContextMenu2 || iid==IID_IContextMenu3)
         {
             std::vector<CatalogItem> favorites;
@@ -371,15 +375,6 @@ HRESULT ShellFolder::GetUIObjectOf(HWND owner,UINT count,PCUITEMID_CHILD_ARRAY i
         {
             owned.push_back(parse_pidl(read_item_id(items[i]).path));
             absolute.push_back(owned.back().get());
-        }
-        // Items in different favorite sections have different filesystem parents.
-        // SHCreateDataObject expects one-segment child PIDLs relative to ONE parent;
-        // an IShellItemArray binds these absolute PIDLs into a valid Shell data object.
-        if(iid==IID_IDataObject)
-        {
-            ComPtr<IShellItemArray> selection;
-            check(SHCreateShellItemArrayFromIDLists(count,absolute.data(),&selection));
-            return selection->BindToHandler(nullptr,BHID_DataObject,iid,result);
         }
         ComPtr<IShellFolder> desktop; check(SHGetDesktopFolder(&desktop));
         return desktop->GetUIObjectOf(owner,count,absolute.data(),iid,nullptr,result);

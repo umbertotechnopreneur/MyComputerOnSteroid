@@ -32,6 +32,10 @@
 
 ### Fixed
 
+- Put Devices and drives before Folders and Apps; keep app favorites in one group.
+  Family groups prioritize Office, PDF and Development, with unassigned suffixes last.
+- Export original file paths for favorite/recent document drag and drop while
+  retaining owned shortcut identities for native Shell operations; prefer copy.
 - Keep the Hide command decorated when only the older Segoe MDL2 font is present.
 - Recent-item presentation across Shell views: preserve document names and icons,
   define native Content/Tile layouts, and prevent target property factories from
