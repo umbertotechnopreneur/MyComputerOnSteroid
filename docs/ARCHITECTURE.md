@@ -10,11 +10,13 @@ normal sorting. The visible name is **My Computer Enhanced**.
 | --- | --- |
 | core/Catalog | Drives; owned favorites; classification, duplicate, rename, icon and removal policy |
 | core/Recents | Optional Windows history source, private cache, filters, dates, pins and hiding |
+| core/ViewSettings | Atomic preferences, target metadata, search and extension-family policy |
 | native/Support | COM/PIDL ownership, HRESULT boundaries, resource strings and diagnostics |
 | native/RecentDialog | Standard Win32 filter dialog: edit, combo, checkbox and buttons |
+| native/ViewDialog | Standard Win32 search/group/order dialog and OS stock icon lifetime |
 | native/MenuIcons | DPI-sized, theme-aware glyph bitmaps owned for native menu lifetime |
 | shell/ItemId | Validated child PIDLs and delegation to real Shell items |
-| shell/Grouping | Section category provider |
+| shell/Grouping | Section, extension and editable family category providers |
 | shell/FavoriteMenu | Native menu delegation, reference-only mutations and added commands |
 | shell/ShellFolder | Enumeration, properties, DefView, grouping, menus and drop |
 | shell/Dll | Class factory and DLL lifetime |
@@ -38,14 +40,56 @@ Apps 3, Files 4, Recent items 5. A category provider supplies groups; empty grou
 are omitted. Shell group collapsing, view modes and sorting remain native.
 No manual item ordering is implemented.
 
-Columns are Name, Section, Location, Recent entry updated and Pinned in recent
-items. The date is typed for native sorting; unrelated items have no recent date.
-Default sorting requests date descending and name ascending. Saved Explorer
-preferences can override defaults. The date maps to the Shell date-modified
-property for the **history entry**, not the target document.
+The original visible columns are Name, Section, Location, Recent entry updated
+and Pinned in recent items. Extension, Extension family and Item date are optional
+columns, mapped to System.FileExtension, System.KindText and System.ItemDate.
+Item date is a typed target modification date for local favorites or history
+entry update time for recent items. Network targets, missing dates and drives
+return empty dates. The original date-modified mapping remains the history entry
+only. Date ordering adds name ascending as its tie-breaker. Explorer's saved view
+preferences can override provider defaults.
 
 The column proplist uses the documented 0 flag for each visible default column;
 an unflagged property is included by the property system but hidden in DefView.
+
+## Collection search and organization
+
+Enumeration applies ViewSettings after the existing recent policy. Empty queries
+match all items. Name matches the launcher alias; Path matches the link target;
+combined mode matches either, including the target suffix. Matching is a
+case-insensitive substring except Extension, which is exact and normalizes an
+optional dot. No directory traversal, content search or Windows Search index is
+involved. Explorer's own search box is not replaced.
+
+IShellFolder2/IFolderViewSettings expose the new properties and ordering defaults.
+ICategoryProvider supplies separate categorizer identities for sections, target
+extensions and editable families. Drives and folders keep their section groups;
+other items use target suffixes rather than .lnk or renamed aliases. Dynamic
+category names are sorted with StrCmpLogicalW. A categorizer reads current family
+definitions per batch so edits do not leave stale classification.
+
+The native background command obtains the owner's active view through public
+IShellWindows, IWebBrowser2, IShellBrowser and IFolderView services, verifies its
+root PIDL, then uses IFolderView2 SetGroupBy/SetSortColumns/SetText and Refresh.
+The view is retained for the command only, avoiding a folder/view lifetime cycle.
+Apply affects that view; notifications refresh other windows' collections without
+forcing their native layout choices. There are no private HWND assumptions.
+
+The per-user view.ini is a bounded UTF-16 preference record, not a conventional
+INI. It holds enum choices, query and multiline family definitions. Names and
+extension assignments are unique ignoring case. Writes validate first, use a
+unique CREATE_NEW temporary file, flush, and atomically replace the complete
+record. Concurrent Apply uses the last complete writer. Cancel never writes;
+corrupt/unreadable optional preferences fall back to unfiltered sections.
+Owned paths reject reparse points. Link metadata is read without Resolve or target
+execution; optional date lookup skips network targets.
+
+The English/Italian dialog uses standard edit, combo, group-box and button
+controls. Decorative search/folder/document icons come from SHGetStockIconInfo
+and are destroyed after the dialog closes. Hint colors follow system colors;
+failed decoration leaves usable text. File-type icons keep Windows associations.
+
+## Native presentation
 
 Custom commands retain native HMENU text/interaction and receive MIIM_BITMAP
 glyphs. Segoe Fluent Icons comes from the installed OS, with Segoe MDL2 Assets
@@ -150,6 +194,9 @@ The native filter dialog preserves the accepted DefView architecture.
 
 - [Default Shell view](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shcreateshellfolderview)
 - [Category providers](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-icategoryprovider)
+- [Apply grouping](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifolderview2-setgroupby)
+- [Item date property](https://learn.microsoft.com/en-us/windows/win32/properties/props-system-itemdate)
+- [Windows stock icons and ownership](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shgetstockiconinfo)
 - [View modes](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifolderview2-setviewmodeandiconsize)
 - [Recent document source](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shaddtorecentdocs)
 - [File-dialog persisted state](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-setclientguid)

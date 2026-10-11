@@ -25,7 +25,7 @@ enum class MenuGlyph : wchar_t
     favorite = 0xe734, pin = 0xe718, unpin = 0xe77a, hide = 0xed1a, remove = 0xe738,
     picture = 0xeb9f, folder = 0xe8b7, folder_open = 0xe838,
     apps = 0xe71d, document = 0xe8a5, filter = 0xe71c,
-    history = 0xe81c, restore = 0xe7a7
+    history = 0xe81c, restore = 0xe7a7, search = 0xe721
 };
 
 struct DeleteMenuBitmap

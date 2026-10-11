@@ -23,3 +23,9 @@
   menus close, use premultiplied alpha, and preserve text when decoration fails.
 - A successful asynchronous BrowseObject call is not proof that navigation
   finished. Confirm the active folder before querying or operating on its view.
+- Apply collection preferences through public active-view interfaces and verify
+  the root. Do not retain a Shell view inside its folder; that creates a COM cycle.
+- A reference's alias, .lnk suffix, target extension and history-entry date are
+  distinct metadata. Test each search/group/order field against its actual source.
+- Refresh and filtering are asynchronous in Explorer. Wait for the view count to
+  converge to enumeration before treating an intermediate empty view as failure.

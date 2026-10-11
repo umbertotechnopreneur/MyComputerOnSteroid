@@ -31,8 +31,10 @@ add_library(MyComputerOnSteroid.Shell SHARED
     src/shell/ShellFolder.cpp
     src/core/Catalog.cpp
     src/core/Recents.cpp
+    src/core/ViewSettings.cpp
     src/native/Support.cpp
     src/native/RecentDialog.cpp
+    src/native/ViewDialog.cpp
     src/native/MenuIcons.cpp
     src/shell/ItemId.cpp
     src/shell/Grouping.cpp
@@ -58,7 +60,7 @@ set_target_properties(MyComputerOnSteroid.Shell PROPERTIES
 )
 
 add_executable(MyComputerOnSteroid WIN32 src/Launcher.cpp src/core/Catalog.cpp src/core/Recents.cpp src/native/Support.cpp resources/Shell.rc)
-add_executable(MyComputerOnSteroid.Tests tests/NativeTests.cpp src/core/Catalog.cpp src/core/Recents.cpp src/native/Support.cpp src/shell/ItemId.cpp resources/Shell.rc)
+add_executable(MyComputerOnSteroid.Tests tests/NativeTests.cpp src/core/Catalog.cpp src/core/Recents.cpp src/core/ViewSettings.cpp src/native/Support.cpp src/shell/ItemId.cpp resources/Shell.rc)
 foreach(target MyComputerOnSteroid MyComputerOnSteroid.Tests)
     target_compile_features(${target} PRIVATE cxx_std_20)
     target_compile_definitions(${target} PRIVATE MCOS_EXECUTABLE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX WINVER=0x0A00 _WIN32_WINNT=0x0A00)
