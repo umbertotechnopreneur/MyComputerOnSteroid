@@ -27,3 +27,7 @@ jobs:
       - name: Compile native Shell provider
         shell: pwsh
         run: ./scripts/Build.ps1 -Architecture '${{ matrix.architecture }}'
+      - name: Test native policies and COM without registration
+        if: matrix.architecture == 'x64'
+        shell: pwsh
+        run: ./scripts/Test.ps1 -Architecture x64 -SkipBuild

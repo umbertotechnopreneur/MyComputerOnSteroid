@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT
+VBWR B
+Project: MyComputerOnSteroid
+Repository: https://github.com/umbertotechnopreneur/MyComputerOnSteroid
+Creator: Umberto Giacobbi | https://umbertogiacobbi.biz
+VibeWare participation: Human intent, AI execution, and plenty of tokens
+Manifesto: https://umbertogiacobbi.biz/vibeware/manifesto
+Created with AI: OpenAI Codex; native MSI authoring; 2026-10-11.
+Human guidance: Umberto Giacobbi; standard Windows installer outside the Store.
+Evidence: docs/VALIDATION.md and Git history; no human code review claimed.
+Copyright (c) 2026 Umberto Giacobbi
+License: MIT
+VBWR E -->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="$(var.ProductId)" Name="My Computer Enhanced" Language="1033" Version="$(var.ProductVersion)"
+           Manufacturer="umbertogiacobbi.biz" UpgradeCode="{3B9CE2AC-ADBC-4214-B9BC-757DA9DEB323}">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" InstallPrivileges="elevated"
+             Platform="$(var.Architecture)" Description="Native Windows Shell launcher" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of MyComputerOnSteroid is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/umbertotechnopreneur/MyComputerOnSteroid" />
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
+    <Property Id="MCOS_WINDOWS_BUILD">
+      <RegistrySearch Id="WindowsBuild" Root="HKLM" Key="SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                      Name="CurrentBuildNumber" Type="raw" Win64="yes" />
+    </Property>
+    <Property Id="MCOS_NATIVE_ARCH">
+      <RegistrySearch Id="NativeArchitecture" Root="HKLM" Key="SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+                      Name="PROCESSOR_ARCHITECTURE" Type="raw" Win64="yes" />
+    </Property>
+    <Condition Message="This package requires Windows 11 $(var.Architecture). Use the package matching your Windows architecture.">
+      Installed OR (MCOS_WINDOWS_BUILD &gt;= 22000 AND MCOS_NATIVE_ARCH = "$(var.NativeArchitecture)")
+    </Condition>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+          <Directory Id="INSTALLFOLDER" Name="MyComputerOnSteroid">
+            <Component Id="ShellBinary" Guid="{3E7BC318-5824-41B1-AB2C-E2705D1E9A73}" Win64="yes">
+              <File Id="ShellDll" Source="$(var.BinDir)\MyComputerOnSteroid.Shell.dll" KeyPath="yes" />
+              <RemoveFolder Id="RemoveProgramFolder" Directory="INSTALLFOLDER" On="uninstall" />
+            </Component>
+            <Component Id="LauncherBinary" Guid="{FAD19009-4B95-4557-BEBE-E21FCFE8DCD4}" Win64="yes">
+              <File Id="LauncherExe" Source="$(var.BinDir)\MyComputerOnSteroid.exe" KeyPath="yes" />
+              <File Id="LicenseFile" Source="$(var.ProjectRoot)\LICENSE" Name="LICENSE.txt" />
+            </Component>
+            <Component Id="ShellRegistration" Guid="*" Win64="yes">
+              <RegistryKey Root="HKLM" Key="Software\Classes\CLSID\{B36B9212-2D35-4E65-8A97-0AA5D280E157}" ForceDeleteOnUninstall="yes">
+                <RegistryValue Type="string" Value="My Computer Enhanced" KeyPath="yes" />
+                <RegistryValue Name="MCOSOwner" Type="string" Value="MyComputerOnSteroid.MSI" />
+                <RegistryValue Name="System.IsPinnedToNameSpaceTree" Type="integer" Value="1" />
+                <RegistryKey Key="InprocServer32">
+                  <RegistryValue Type="string" Value="[INSTALLFOLDER]MyComputerOnSteroid.Shell.dll" />
+                  <RegistryValue Name="ThreadingModel" Type="string" Value="Apartment" />
+                </RegistryKey>
+                <RegistryKey Key="DefaultIcon"><RegistryValue Type="string" Value="[System64Folder]imageres.dll,-109" /></RegistryKey>
+                <RegistryKey Key="ShellFolder">
+                  <RegistryValue Name="Attributes" Type="integer" Value="-1476394736" />
+                </RegistryKey>
+              </RegistryKey>
+              <RegistryKey Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\Explorer\MyComputer\NameSpace\{B36B9212-2D35-4E65-8A97-0AA5D280E157}" ForceDeleteOnUninstall="yes">
+                <RegistryValue Type="string" Value="My Computer Enhanced" />
+                <RegistryValue Name="MCOSOwner" Type="string" Value="MyComputerOnSteroid.MSI" />
+              </RegistryKey>
+            </Component>
+          </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="StartFolder" Name="MyComputerOnSteroid">
+          <Component Id="StartShortcut" Guid="*" Win64="yes">
+            <Shortcut Id="StartLauncher" Name="My Computer Enhanced" Target="[INSTALLFOLDER]MyComputerOnSteroid.exe" Arguments="--open" WorkingDirectory="INSTALLFOLDER" />
+            <RemoveFolder Id="RemoveStartFolder" On="uninstall" />
+            <RegistryValue Root="HKCU" Key="Software\umbertogiacobbi.biz\MyComputerOnSteroid\Installer" Name="StartShortcut" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+    <Feature Id="Launcher" Title="MyComputerOnSteroid" Level="1">
+      <ComponentRef Id="ShellBinary" /><ComponentRef Id="LauncherBinary" />
+      <ComponentRef Id="ShellRegistration" /><ComponentRef Id="StartShortcut" />
+    </Feature>
+    <!-- Windows Installer supplies its standard basic progress UI. No third-party
+         UI extension or custom-action DLL is embedded in this package. -->
+  </Product>
+</Wix>

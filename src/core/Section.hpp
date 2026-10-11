@@ -26,10 +26,11 @@ enum class Section : std::uint32_t
     drives = 2,
     apps = 3,
     files = 4,
+    recents = 5,
 };
 
 inline constexpr std::array section_order{
-    Section::folders, Section::drives, Section::apps, Section::files};
+    Section::folders, Section::drives, Section::apps, Section::files, Section::recents};
 
 // A drive is a system item, never a removable favorite.
 [[nodiscard]] constexpr bool is_favorite_section(Section section) noexcept
