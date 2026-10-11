@@ -14,9 +14,10 @@ This record does not certify the planned launcher.
 | CMake | 4.3.1-msvc1 |
 | Compiler warnings | `/W4 /WX` enabled; successful builds |
 | Native DLL identity and exports | Both PE architectures, publisher metadata and two COM exports verified |
-| Relative documentation links and source provenance | 35 relative links and all C++/resource attribution markers checked |
+| Relative documentation links and source provenance | Local links and all C++/resource attribution markers checked |
 | Asset provenance | Approved logo copied byte-for-byte; SHA-256 matches the recorded source |
-| GitHub build | Not yet observed |
+| GitHub build | Debug x64 and ARM64 passed on Windows Server 2022 runners |
+| GitHub publication | Public repository; GitHub recognizes the MIT license |
 | Automated tests | Not run; no suite exists yet |
 | COM runtime activation and lifetime | Not run |
 | Explorer registration and native UI | Not performed |
@@ -33,6 +34,11 @@ pwsh -NoProfile -File ./scripts/Build.ps1 -Architecture arm64
 The initial compilation exposed an unclosed namespace and a mismatch between
 export exception specifications and the Windows SDK declarations. Both were
 corrected before the successful builds above.
+
+Remote evidence: [Native build run 38127650216](https://github.com/umbertotechnopreneur/MyComputerOnSteroid/actions/runs/38127650216)
+for source commit `ffa56301b1dc61ce1d38ff58838a7034eeb0f437`.
+Both architecture jobs completed successfully. Subsequent delivery-record edits
+change documentation only and do not imply additional runtime verification.
 
 ## Required integration evidence
 
