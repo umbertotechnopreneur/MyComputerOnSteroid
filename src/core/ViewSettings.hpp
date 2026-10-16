@@ -19,7 +19,13 @@ namespace mcos
 enum class GroupMode : unsigned { sections, extension, families, none };
 enum class SearchField : unsigned { any, name, path, extension };
 enum class ItemOrder : unsigned { name, date };
-struct ExtensionFamily { std::wstring name; std::vector<std::wstring> extensions; };
+struct ExtensionFamily
+{
+    std::wstring name;
+    std::vector<std::wstring> extensions;
+};
+
+// Per-user choices shared by enumeration, the native dialog and Shell grouping.
 struct ViewSettings
 {
     GroupMode grouping{GroupMode::sections};
@@ -29,12 +35,21 @@ struct ViewSettings
     std::wstring query;
     std::wstring families;
 };
+// Missing or corrupt optional preferences return the default collection view.
 ViewSettings view_settings();
+
+// Validates and atomically replaces one complete preference record.
 void save_view_settings(const ViewSettings& settings);
+
+// Parses "Family = ext, ext" lines; names and extensions must be unique.
 std::vector<ExtensionFamily> parse_families(const std::wstring& definitions);
+
+// Reads an owned shortcut without resolving or executing its target.
 std::wstring item_target_path(const CatalogItem& item);
 std::wstring item_extension(const CatalogItem& item);
 std::wstring item_family(const CatalogItem& item, const std::vector<ExtensionFamily>& families);
+// Uses history-entry time for recents and local target modification time for
+// favorites. Network targets are skipped to keep optional metadata responsive.
 FILETIME item_date(const CatalogItem& item);
 bool matches_search(const CatalogItem& item, const ViewSettings& settings);
 }

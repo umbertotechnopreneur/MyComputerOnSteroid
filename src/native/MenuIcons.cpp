@@ -6,6 +6,7 @@
  * VibeWare participation: Human intent, AI execution, and plenty of tokens
  * Manifesto: https://umbertogiacobbi.biz/vibeware/manifesto
  * Created with AI: OpenAI Codex; native menu glyphs; 2026-10-11.
+ * Modified with AI: OpenAI Codex; remove legacy font fallback and clarify alpha rendering; 2026-10-17.
  * Human guidance: Umberto Giacobbi; Windows 11 style on native menu commands.
  * Evidence: docs/VALIDATION.md and Git history; no human code review claimed.
  * Copyright (c) 2026 Umberto Giacobbi
@@ -67,46 +68,57 @@ MenuBitmap render(MenuGlyph glyph, int pixels, COLORREF color) noexcept
     SelectObjectBack restore_bitmap{dc.get(), SelectObject(dc.get(), bitmap.get())};
     if (!restore_bitmap.previous || restore_bitmap.previous == HGDI_ERROR) return {};
 
-    for (PCWSTR face : {L"Segoe Fluent Icons", L"Segoe MDL2 Assets"})
+    constexpr PCWSTR face = L"Segoe Fluent Icons";
+    std::unique_ptr<void, DeleteFont> font(CreateFontW(-pixels, 0, 0, 0, FW_NORMAL,
+        FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        ANTIALIASED_QUALITY, DEFAULT_PITCH, face));
+    if (!font) return {};
+
+    SelectObjectBack restore_font{dc.get(), SelectObject(dc.get(), font.get())};
+    if (!restore_font.previous || restore_font.previous == HGDI_ERROR) return {};
+
+    wchar_t actual_face[LF_FACESIZE]{};
+    if (!GetTextFaceW(dc.get(), ARRAYSIZE(actual_face), actual_face)) return {};
+    if (_wcsicmp(actual_face, face) != 0) return {};
+
+    // Even current Windows 11 font versions can lack Hide. Use Remove's symbol
+    // for that command when needed; this does not change the command's meaning.
+    const MenuGlyph candidates[]{glyph, MenuGlyph::remove};
+    const UINT count = glyph == MenuGlyph::hide ? 2u : 1u;
+    for (UINT candidate = 0; candidate < count; ++candidate)
     {
-        std::unique_ptr<void, DeleteFont> font(CreateFontW(-pixels, 0, 0, 0, FW_NORMAL,
-            FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-            ANTIALIASED_QUALITY, DEFAULT_PITCH, face));
-        if (!font) continue;
-        SelectObjectBack restore_font{dc.get(), SelectObject(dc.get(), font.get())};
-        if (!restore_font.previous || restore_font.previous == HGDI_ERROR) continue;
-        wchar_t actual_face[LF_FACESIZE]{};
-        if (!GetTextFaceW(dc.get(), ARRAYSIZE(actual_face), actual_face) || _wcsicmp(actual_face, face) != 0) continue;
-        // Font family presence does not guarantee a particular glyph/version.
-        // Try the compatible symbol in either font only if Hide cannot render.
-        const MenuGlyph candidates[]{glyph, MenuGlyph::remove};
-        const UINT count = glyph == MenuGlyph::hide ? 2u : 1u;
-        for (UINT candidate = 0; candidate < count; ++candidate)
+        const wchar_t character = static_cast<wchar_t>(candidates[candidate]);
+        WORD glyph_index = 0xffff;
+        const auto glyph_result = GetGlyphIndicesW(dc.get(), &character, 1, &glyph_index,
+            GGI_MARK_NONEXISTING_GLYPHS);
+        if (glyph_result == GDI_ERROR || glyph_index == 0xffff) continue;
+
+        auto* bits = static_cast<std::uint32_t*>(raw);
+        const int pixel_count = pixels * pixels;
+        std::fill_n(bits, pixel_count, 0x00ffffffu);
+        SetBkMode(dc.get(), TRANSPARENT);
+        SetTextColor(dc.get(), RGB(0, 0, 0));
+        RECT rectangle{0, 0, pixels, pixels};
+        const UINT flags = DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX;
+        if (!DrawTextW(dc.get(), &character, 1, &rectangle, flags)) continue;
+        GdiFlush();
+
+        // Convert GDI's grayscale coverage into a premultiplied-alpha bitmap
+        // for the native menu. Color channels must never exceed their alpha.
+        bool visible = false;
+        for (int index = 0; index < pixel_count; ++index)
         {
-            const wchar_t character = static_cast<wchar_t>(candidates[candidate]);
-            WORD glyph_index = 0xffff;
-            if (GetGlyphIndicesW(dc.get(), &character, 1, &glyph_index, GGI_MARK_NONEXISTING_GLYPHS) == GDI_ERROR ||
-                glyph_index == 0xffff) continue;
-            auto* bits = static_cast<std::uint32_t*>(raw);
-            std::fill_n(bits, pixels * pixels, 0x00ffffffu);
-            SetBkMode(dc.get(), TRANSPARENT);
-            SetTextColor(dc.get(), RGB(0, 0, 0));
-            RECT rectangle{0, 0, pixels, pixels};
-            if (!DrawTextW(dc.get(), &character, 1, &rectangle, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX)) continue;
-            GdiFlush();
-            // GDI text supplies a grayscale coverage mask. Native menus consume a
-            // top-down 32-bit DIB with premultiplied alpha, including hover states.
-            bool visible = false;
-            for (int i = 0; i < pixels * pixels; ++i)
-            {
-                const auto gray = ((bits[i] & 0xff) + ((bits[i] >> 8) & 0xff) + ((bits[i] >> 16) & 0xff)) / 3;
-                const auto alpha = 255 - gray;
-                visible = visible || alpha != 0;
-                bits[i] = (alpha << 24) | ((GetRValue(color) * alpha / 255) << 16) |
-                    ((GetGValue(color) * alpha / 255) << 8) | (GetBValue(color) * alpha / 255);
-            }
-            if (visible) return bitmap;
+            const auto pixel = bits[index];
+            const auto gray = ((pixel & 0xff) + ((pixel >> 8) & 0xff) + ((pixel >> 16) & 0xff)) / 3;
+            const auto alpha = 255 - gray;
+            const auto red = GetRValue(color) * alpha / 255;
+            const auto green = GetGValue(color) * alpha / 255;
+            const auto blue = GetBValue(color) * alpha / 255;
+
+            visible = visible || alpha != 0;
+            bits[index] = (alpha << 24) | (red << 16) | (green << 8) | blue;
         }
+        if (visible) return bitmap;
     }
     return {};
 }

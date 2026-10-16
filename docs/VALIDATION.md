@@ -1,5 +1,40 @@
 # Validation record
 
+## Native readability and current-format cleanup, 2026-10-17
+
+- Debug x64 compilation and the isolated native suite passed for the shared
+  process helpers, command table, dialog refactor and Fluent-only menu rendering.
+- Final Release x64 compilation passed with `/W4 /WX`; its isolated native suite
+  passed 259 assertions. New regressions round-trip empty, quoted, Unicode and
+  trailing-backslash arguments through Windows' parser and invoke the recent
+  toggle through both public Shell background-menu messages.
+- The final x64 0.0.0 MSI passed WiX ICE validation. Packaging did not install it.
+- The manager now reads only the This PC namespace, checks ownership in both
+  hives before mutation and updates existing classes in place. These registry
+  changes are compiled but have not been exercised against live registrations.
+- No importer or migration script remains. The temporary script was deleted
+  without execution. The application supports its current registration format.
+- This pass did not install/register the provider, restart Explorer or exercise
+  the dialogs visually. The earlier installed build remains separate from this
+  source. ARM64 was not rerun locally in this pass.
+- Concrete examples, remaining refactor candidates and the lack of cross-hive
+  write rollback are recorded in [CODE_REVIEW.md](CODE_REVIEW.md).
+
+## This PC folder manager package, 2026-10-16
+
+- Debug and Release x64 compilation passed with `/W4 /WX` for the native manager, its
+  background-menu command and the folder-only drag-and-drop route.
+- The x64 0.0.0 development MSI passed WiX ICE validation. It reuses the installed
+  development ProductCode for an in-place repair.
+- The build generated the launcher, Shell DLL and test runner. It did not run
+  tests or visually exercise the new menu, dialog or drop route.
+- The old Tools configuration and its earlier JSON backup were removed after
+  checking all four entries against both registry hives and checking that their
+  ICO files still exist. All four live registrations and original folders were
+  preserved. The two existing Explorer processes remained running.
+- Installation and live registration migration remain pending while the owner
+  copies files in Explorer. No MSI repair or Explorer restart was performed.
+
 ## Group order and document transfer, 2026-10-12
 
 - Local x64 Debug and final Release native suites passed with `/W4 /WX`; final

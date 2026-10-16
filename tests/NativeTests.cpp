@@ -6,6 +6,7 @@
  * VibeWare participation: Human intent, AI execution, and plenty of tokens
  * Manifesto: https://umbertogiacobbi.biz/vibeware/manifesto
  * Created with AI: OpenAI Codex; native launcher implementation; 2026-10-11.
+ * Modified with AI: OpenAI Codex; argument parsing and background-menu regressions; 2026-10-17.
  * Human guidance: Umberto Giacobbi; standard Shell view, native menus and MSI.
  * Evidence: docs/VALIDATION.md and Git history; no human code review claimed.
  * Copyright (c) 2026 Umberto Giacobbi
@@ -34,6 +35,66 @@ void require(bool condition,const char* message)
 {
     if(!condition) { std::cerr<<"FAIL: "<<message<<"\n"; throw HResultError{E_FAIL}; }
     std::cout<<"PASS: "<<message<<"\n";
+}
+
+void verify_argument_quoting()
+{
+    const std::array<std::wstring_view, 7> arguments{
+        L"", L"plain", LR"(C:\)", LR"(E:\folder with spaces\)",
+        LR"(E:\a\"quoted"\folder)", LR"(\\server\share\folder\)", L"cartella è"
+    };
+
+    for (const auto argument : arguments)
+    {
+        const auto command_line = L"launcher.exe " + quote_command_line_argument(argument);
+        int count{};
+        auto* parsed = CommandLineToArgvW(command_line.c_str(), &count);
+        check_win32(parsed != nullptr);
+        const bool preserved = count == 2 && argument == parsed[1];
+        LocalFree(parsed);
+        require(preserved, "command arguments round-trip through the Windows parser");
+    }
+}
+
+void verify_background_menu(IShellFolder2* folder)
+{
+    ComPtr<IContextMenuCB> callback;
+    check(folder->QueryInterface(IID_PPV_ARGS(&callback)));
+
+    const HMENU menu = CreatePopupMenu();
+    check_win32(menu != nullptr);
+    constexpr UINT first_id = 120;
+    QCMINFO info{};
+    info.hmenu = menu;
+    info.idCmdFirst = first_id;
+    info.idCmdLast = first_id + 100;
+    const auto merged = callback->CallBack(folder, nullptr, nullptr, DFM_MERGECONTEXTMENU,
+        0, reinterpret_cast<LPARAM>(&info));
+
+    UINT toggle_id = 0;
+    bool has_this_pc_manager = false;
+    const auto toggle_label = text(IDS_RECENT_SHOW);
+    const auto manager_label = text(IDS_MANAGE_THIS_PC);
+    for (int index = 0; index < GetMenuItemCount(menu); ++index)
+    {
+        wchar_t label[256]{};
+        GetMenuStringW(menu, static_cast<UINT>(index), label, ARRAYSIZE(label), MF_BYPOSITION);
+        if (toggle_label == label) toggle_id = GetMenuItemID(menu, index);
+        if (manager_label == label) has_this_pc_manager = true;
+    }
+    DestroyMenu(menu);
+    check(merged);
+    require(has_this_pc_manager && toggle_id >= first_id,
+        "background menu contains direct This PC management and the recent toggle");
+
+    const bool initially_enabled = recent_settings().enabled;
+    const auto offset = toggle_id - first_id;
+    check(callback->CallBack(folder, nullptr, nullptr, DFM_INVOKECOMMAND, offset, 0));
+    require(recent_settings().enabled != initially_enabled,
+        "a merged menu offset dispatches its named action after inserting a command");
+    check(callback->CallBack(folder, nullptr, nullptr, DFM_INVOKECOMMANDEX, offset, 0));
+    require(recent_settings().enabled == initially_enabled,
+        "both public Shell invocation messages dispatch the same background action");
 }
 
 std::string contents(const std::filesystem::path& path)
@@ -120,7 +181,7 @@ void verify_launcher_icons(HMENU popup,IContextMenu* menu)
             HDC dc=CreateCompatibleDC(nullptr);
             if(dc)
             {
-                for(PCWSTR face:{L"Segoe Fluent Icons",L"Segoe MDL2 Assets"})
+                for(PCWSTR face:{L"Segoe Fluent Icons"})
                 {
                     HFONT font=CreateFontW(-16,0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
                         OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,face);
@@ -513,6 +574,8 @@ int wmain(int count,wchar_t** arguments)
             check(factory->CreateInstance(nullptr,IID_PPV_ARGS(&shell)));
             ComPtr<IPersistFolder2> persistence; check(shell.As(&persistence));
             ITEMIDLIST desktop{}; check(persistence->Initialize(&desktop));
+            verify_argument_quoting();
+            verify_background_menu(shell.Get());
             PIDLIST_ABSOLUTE raw_root=nullptr; check(persistence->GetCurFolder(&raw_root)); Pidl root(raw_root);
             require(root && root.get()!=&desktop && ILIsEmpty(root.get()),"folder clones root PIDL ownership");
             STRRET canonical{}; check(shell->GetDisplayNameOf(&desktop,SHGDN_FORPARSING,&canonical));

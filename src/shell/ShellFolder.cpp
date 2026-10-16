@@ -6,6 +6,7 @@
  * VibeWare participation: Human intent, AI execution, and plenty of tokens
  * Manifesto: https://umbertogiacobbi.biz/vibeware/manifesto
  * Created with AI: OpenAI Codex; native launcher implementation; 2026-10-11.
+ * Modified with AI: OpenAI Codex; explicit menu actions and readable drop flow; 2026-10-17.
  * Human guidance: Umberto Giacobbi; standard Shell view, native menus and MSI.
  * Evidence: docs/VALIDATION.md and Git history; no human code review claimed.
  * Copyright (c) 2026 Umberto Giacobbi
@@ -28,6 +29,7 @@
 #include <Propsys.h>
 #include <CommCtrl.h>
 #include <algorithm>
+#include <array>
 #include <ExDisp.h>
 #include <ShlGuid.h>
 
@@ -35,6 +37,87 @@ namespace mcos::shell
 {
 namespace
 {
+enum class BackgroundAction
+{
+    add_folder,
+    add_app,
+    add_file,
+    manage_this_pc,
+    manage_favorites,
+    filter_recents,
+    toggle_recents,
+    restore_recents,
+    organize,
+    clear_search
+};
+
+struct BackgroundCommand
+{
+    BackgroundAction action;
+    UINT label;
+    MenuGlyph glyph;
+    UINT error_label;
+};
+
+// Explorer invokes an offset into the merged commands. Keep ordering, labels,
+// decoration and error messages in one table so inserting a command is safe.
+constexpr std::array BackgroundCommands{
+    BackgroundCommand{BackgroundAction::add_folder, IDS_ADD_FOLDER, MenuGlyph::folder, IDS_ERROR_ADD},
+    BackgroundCommand{BackgroundAction::add_app, IDS_ADD_APP, MenuGlyph::apps, IDS_ERROR_ADD},
+    BackgroundCommand{BackgroundAction::add_file, IDS_ADD_FILE, MenuGlyph::document, IDS_ERROR_ADD},
+    BackgroundCommand{BackgroundAction::manage_this_pc, IDS_MANAGE_THIS_PC, MenuGlyph::folder_open, IDS_ERROR_THIS_PC},
+    BackgroundCommand{BackgroundAction::manage_favorites, IDS_MANAGE, MenuGlyph::folder_open, IDS_ERROR_ADD},
+    BackgroundCommand{BackgroundAction::filter_recents, IDS_RECENT_FILTERS, MenuGlyph::filter, IDS_ERROR_RECENTS},
+    BackgroundCommand{BackgroundAction::toggle_recents, IDS_RECENT_SHOW, MenuGlyph::history, IDS_ERROR_RECENTS},
+    BackgroundCommand{BackgroundAction::restore_recents, IDS_RECENT_RESTORE, MenuGlyph::restore, IDS_ERROR_RECENTS},
+    BackgroundCommand{BackgroundAction::organize, IDS_VIEW_OPTIONS, MenuGlyph::search, IDS_ERROR_VIEW},
+    BackgroundCommand{BackgroundAction::clear_search, IDS_CLEAR_SEARCH, MenuGlyph::restore, IDS_ERROR_VIEW}
+};
+
+const BackgroundCommand* background_command(WPARAM offset) noexcept
+{
+    return offset < BackgroundCommands.size() ? &BackgroundCommands[offset] : nullptr;
+}
+
+std::filesystem::path launcher_path()
+{
+    return module_path(current_module()).parent_path() / L"MyComputerOnSteroid.exe";
+}
+
+HRESULT open_this_pc_entry_manager(HWND owner)
+{
+    return launch_process(owner, launcher_path(), L"--manage-this-pc");
+}
+
+HRESULT add_dropped_folders_to_this_pc(HWND owner, IShellItemArray* items)
+{
+    DWORD count{};
+    check(items->GetCount(&count));
+    if (!count) return S_FALSE;
+
+    std::wstring parameters{L"--add-this-pc"};
+    for (DWORD index = 0; index < count; ++index)
+    {
+        ComPtr<IShellItem> item;
+        check(items->GetItemAt(index, &item));
+        constexpr SFGAOF required = SFGAO_FOLDER | SFGAO_FILESYSTEM;
+        SFGAOF attributes{};
+        check(item->GetAttributes(required, &attributes));
+        const bool is_real_folder = (attributes & required) == required;
+        if (!is_real_folder) return S_FALSE;
+
+        const auto path = display_name(item.Get(), SIGDN_FILESYSPATH);
+        parameters += L" ";
+        parameters += quote_command_line_argument(path);
+    }
+
+    // S_FALSE above means "use favorites". Cancellation after choosing the
+    // direct-folder route means "make no change", never "use favorites".
+    const auto status = launch_process(owner, launcher_path(), parameters);
+    return status == S_FALSE ? S_OK : status;
+}
+
+// Enumerates a snapshot: PIDLs returned to Explorer are independent allocations.
 class ItemEnumerator final : public IEnumIDList
 {
 public:
@@ -111,8 +194,13 @@ std::wstring formatted_time(FILETIME time)
 }
 PROPERTYKEY group_key(GroupMode mode) noexcept
 {
-    return mode==GroupMode::extension ? PKEY_FileExtension : mode==GroupMode::families ? PKEY_KindText :
-        mode==GroupMode::none ? PKEY_Null : PKEY_ItemTypeText;
+    switch (mode)
+    {
+    case GroupMode::extension: return PKEY_FileExtension;
+    case GroupMode::families: return PKEY_KindText;
+    case GroupMode::none: return PKEY_Null;
+    default: return PKEY_ItemTypeText;
+    }
 }
 ComPtr<IShellView> active_view(HWND owner,PCIDLIST_ABSOLUTE root)
 {
@@ -140,15 +228,83 @@ ComPtr<IShellView> active_view(HWND owner,PCIDLIST_ABSOLUTE root)
     }
     check(E_NOINTERFACE); return {};
 }
-void apply_view(IShellView* shell_view,const ViewSettings& settings)
+std::array<SORTCOLUMN, 2> sort_columns(const ViewSettings& settings)
 {
-    ComPtr<IFolderView2> view; check(shell_view->QueryInterface(IID_PPV_ARGS(&view)));
-    check(view->SetGroupBy(group_key(settings.grouping),TRUE));
-    SORTCOLUMN columns[2]{{settings.order==ItemOrder::name ? PKEY_ItemNameDisplay : PKEY_ItemDate,
-        settings.descending ? SORT_DESCENDING : SORT_ASCENDING},{PKEY_ItemNameDisplay,SORT_ASCENDING}};
-    check(view->SetSortColumns(columns,settings.order==ItemOrder::date ? 2 : 1));
-    check(view->SetText(FVST_EMPTYTEXT,settings.query.empty() ? L"" : text(IDS_NO_SEARCH_RESULTS).c_str()));
+    const auto primary_key = settings.order == ItemOrder::name ? PKEY_ItemNameDisplay : PKEY_ItemDate;
+    const auto direction = settings.descending ? SORT_DESCENDING : SORT_ASCENDING;
+    return {SORTCOLUMN{primary_key, direction}, SORTCOLUMN{PKEY_ItemNameDisplay, SORT_ASCENDING}};
+}
+
+void apply_view(IShellView* shell_view, const ViewSettings& settings)
+{
+    ComPtr<IFolderView2> view;
+    check(shell_view->QueryInterface(IID_PPV_ARGS(&view)));
+    check(view->SetGroupBy(group_key(settings.grouping), TRUE));
+
+    const auto columns = sort_columns(settings);
+    const int count = settings.order == ItemOrder::date ? 2 : 1;
+    check(view->SetSortColumns(columns.data(), count));
+
+    const auto empty_text = settings.query.empty() ? L"" : text(IDS_NO_SEARCH_RESULTS);
+    check(view->SetText(FVST_EMPTYTEXT, empty_text.c_str()));
     check(shell_view->Refresh());
+}
+
+HRESULT invoke_background_command(HWND owner, PCIDLIST_ABSOLUTE root, BackgroundAction action)
+{
+    switch (action)
+    {
+    case BackgroundAction::add_folder:
+        choose_favorite(owner, Section::folders);
+        return S_OK;
+    case BackgroundAction::add_app:
+        choose_favorite(owner, Section::apps);
+        return S_OK;
+    case BackgroundAction::add_file:
+        choose_favorite(owner, Section::files);
+        return S_OK;
+    case BackgroundAction::manage_this_pc:
+        return open_this_pc_entry_manager(owner);
+    case BackgroundAction::manage_favorites:
+    {
+        const auto path = data_root() / L"Favorites";
+        std::filesystem::create_directories(path);
+        return launch_process(owner, path, L"");
+    }
+    case BackgroundAction::filter_recents:
+        choose_recent_filters(owner);
+        return S_OK;
+    case BackgroundAction::toggle_recents:
+    {
+        auto settings = recent_settings();
+        settings.enabled = !settings.enabled;
+        save_recent_settings(settings);
+        return S_OK;
+    }
+    case BackgroundAction::restore_recents:
+        restore_hidden_recents();
+        return S_OK;
+    case BackgroundAction::organize:
+    case BackgroundAction::clear_search:
+    {
+        auto settings = view_settings();
+        const auto view = active_view(owner, root);
+
+        if (action == BackgroundAction::organize)
+        {
+            if (!choose_view_settings(owner, settings)) return S_OK;
+        }
+        else
+        {
+            settings.query.clear();
+        }
+
+        save_view_settings(settings);
+        apply_view(view.Get(), settings);
+        return S_OK;
+    }
+    }
+    return S_FALSE;
 }
 std::wstring detail(const CatalogItem& item,UINT column)
 {
@@ -529,85 +685,104 @@ HRESULT ShellFolder::MessageSFVCB(UINT message,WPARAM first,LPARAM second) noexc
 }
 HRESULT ShellFolder::CallBack(IShellFolder*,HWND owner,IDataObject*,UINT message,WPARAM first,LPARAM second) noexcept
 {
-    const auto status=guarded([&]{
-        if(message==DFM_MERGECONTEXTMENU)
+    const bool is_invocation = message == DFM_INVOKECOMMAND || message == DFM_INVOKECOMMANDEX;
+    const auto* invoked_command = is_invocation ? background_command(first) : nullptr;
+
+    const auto status = guarded([&] {
+        if (message == DFM_MERGECONTEXTMENU)
         {
-            auto* menu=reinterpret_cast<QCMINFO*>(second);
-            if(!menu) return E_POINTER;
-            if(first & CMF_DEFAULTONLY) return S_OK;
-            for(UINT label:{IDS_ADD_FOLDER,IDS_ADD_APP,IDS_ADD_FILE,IDS_MANAGE,IDS_RECENT_FILTERS,IDS_RECENT_SHOW,IDS_RECENT_RESTORE,
-                IDS_VIEW_OPTIONS,IDS_CLEAR_SEARCH})
+            auto* menu = reinterpret_cast<QCMINFO*>(second);
+            if (!menu) return E_POINTER;
+            if (first & CMF_DEFAULTONLY) return S_OK;
+
+            const bool show_recents = recent_settings().enabled;
+            const bool search_is_empty = view_settings().query.empty();
+
+            for (const auto& command : BackgroundCommands)
             {
-                if(menu->idCmdFirst>menu->idCmdLast) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
-                const UINT flags=MF_BYPOSITION|MF_STRING|
-                    (label==IDS_RECENT_SHOW && recent_settings().enabled ? MF_CHECKED : 0)|
-                    (label==IDS_CLEAR_SEARCH && view_settings().query.empty() ? MF_GRAYED : 0);
-                const UINT command=menu->idCmdFirst++;
-                check_win32(InsertMenuW(menu->hmenu,menu->indexMenu++,flags,command,text(label).c_str()));
-                const MenuGlyph glyph=label==IDS_ADD_FOLDER ? MenuGlyph::folder :
-                    label==IDS_ADD_APP ? MenuGlyph::apps : label==IDS_ADD_FILE ? MenuGlyph::document :
-                    label==IDS_MANAGE ? MenuGlyph::folder_open : label==IDS_RECENT_FILTERS ? MenuGlyph::filter :
-                    label==IDS_RECENT_SHOW ? MenuGlyph::history : label==IDS_VIEW_OPTIONS ? MenuGlyph::search : MenuGlyph::restore;
-                menu_icons_.attach(menu->hmenu,command,glyph,owner);
+                if (menu->idCmdFirst > menu->idCmdLast) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+
+                UINT flags = MF_BYPOSITION | MF_STRING;
+                if (command.action == BackgroundAction::toggle_recents && show_recents) flags |= MF_CHECKED;
+                if (command.action == BackgroundAction::clear_search && search_is_empty) flags |= MF_GRAYED;
+
+                const UINT command_id = menu->idCmdFirst++;
+                const auto label = text(command.label);
+                check_win32(InsertMenuW(menu->hmenu, menu->indexMenu++, flags, command_id, label.c_str()));
+                menu_icons_.attach(menu->hmenu, command_id, command.glyph, owner);
             }
             return S_OK;
         }
-        if(message==DFM_INVOKECOMMAND || message==DFM_INVOKECOMMANDEX)
+
+        if (is_invocation)
         {
-            if(first<3)
-            { choose_favorite(owner,first==0 ? Section::folders : first==1 ? Section::apps : Section::files); return S_OK; }
-            if(first==3)
-            {
-                const auto path=data_root()/L"Favorites"; std::filesystem::create_directories(path);
-                auto launched=reinterpret_cast<INT_PTR>(ShellExecuteW(owner,L"open",path.c_str(),nullptr,nullptr,SW_SHOWNORMAL));
-                return launched>32 ? S_OK : HRESULT_FROM_WIN32(ERROR_OPEN_FAILED);
-            }
-            if(first==4) { choose_recent_filters(owner); return S_OK; }
-            if(first==5)
-            { auto settings=recent_settings(); settings.enabled=!settings.enabled; save_recent_settings(settings); return S_OK; }
-            if(first==6) { restore_hidden_recents(); return S_OK; }
-            if(first==7 || first==8)
-            {
-                auto settings=view_settings(); auto view=active_view(owner,root_.get());
-                if(first==7) { if(!choose_view_settings(owner,settings)) return S_OK; }
-                else settings.query.clear();
-                save_view_settings(settings); apply_view(view.Get(),settings); return S_OK;
-            }
-            return S_FALSE;
+            if (!invoked_command) return S_FALSE;
+            return invoke_background_command(owner, root_.get(), invoked_command->action);
         }
+
         return E_NOTIMPL;
     });
-    if(FAILED(status) && (message==DFM_INVOKECOMMAND || message==DFM_INVOKECOMMANDEX))
-        report_error(owner,status,first==7 || first==8 ? IDS_ERROR_VIEW :
-            first>=4 && first<=6 ? IDS_ERROR_RECENTS : IDS_ERROR_ADD);
+
+    if (FAILED(status) && invoked_command)
+        report_error(owner, status, invoked_command->error_label);
     return status;
 }
 HRESULT ShellFolder::DragEnter(IDataObject* data,DWORD,POINTL,DWORD* effect) noexcept
 {
-    if(!effect) return E_POINTER;
+    if (!effect) return E_POINTER;
     ComPtr<IShellItemArray> items;
-    acceptable_drop_=data && SUCCEEDED(SHCreateShellItemArrayFromDataObject(data,IID_PPV_ARGS(&items)));
-    *effect=acceptable_drop_ ? drop_effect(*effect) : DROPEFFECT_NONE; return S_OK;
+    acceptable_drop_ = data && SUCCEEDED(SHCreateShellItemArrayFromDataObject(data, IID_PPV_ARGS(&items)));
+    *effect = acceptable_drop_ ? drop_effect(*effect) : DROPEFFECT_NONE;
+    return S_OK;
 }
 HRESULT ShellFolder::DragOver(DWORD,POINTL,DWORD* effect) noexcept
 {
-    if(!effect) return E_POINTER;
-    *effect=acceptable_drop_ ? drop_effect(*effect) : DROPEFFECT_NONE; return S_OK;
+    if (!effect) return E_POINTER;
+    *effect = acceptable_drop_ ? drop_effect(*effect) : DROPEFFECT_NONE;
+    return S_OK;
 }
-HRESULT ShellFolder::DragLeave() noexcept { acceptable_drop_=false; return S_OK; }
+
+HRESULT ShellFolder::DragLeave() noexcept
+{
+    acceptable_drop_ = false;
+    return S_OK;
+}
+
 HRESULT ShellFolder::Drop(IDataObject* data,DWORD,POINTL,DWORD* effect) noexcept
 {
-    if(!effect) return E_POINTER;
-    const DWORD accepted=drop_effect(*effect); *effect=DROPEFFECT_NONE; acceptable_drop_=false;
-    const auto status=guarded([&]{
-        if(!data || !accepted) return E_INVALIDARG;
-        ComPtr<IShellItemArray> items; check(SHCreateShellItemArrayFromDataObject(data,IID_PPV_ARGS(&items)));
-        DWORD count{}; check(items->GetCount(&count));
-        for(DWORD i=0;i<count;++i)
-        { ComPtr<IShellItem> item; check(items->GetItemAt(i,&item)); add_favorite(item.Get()); }
-        *effect=accepted; return S_OK;
+    if (!effect) return E_POINTER;
+
+    const DWORD accepted = drop_effect(*effect);
+    *effect = DROPEFFECT_NONE;
+    acceptable_drop_ = false;
+
+    const auto status = guarded([&] {
+        if (!data || !accepted) return E_INVALIDARG;
+        ComPtr<IShellItemArray> items;
+        check(SHCreateShellItemArrayFromDataObject(data, IID_PPV_ARGS(&items)));
+
+        const auto direct_status = add_dropped_folders_to_this_pc(view_window_, items.Get());
+        if (direct_status != S_FALSE)
+        {
+            check(direct_status);
+            *effect = accepted;
+            return S_OK;
+        }
+
+        DWORD count{};
+        check(items->GetCount(&count));
+        for (DWORD index = 0; index < count; ++index)
+        {
+            ComPtr<IShellItem> item;
+            check(items->GetItemAt(index, &item));
+            add_favorite(item.Get());
+        }
+
+        *effect = accepted;
+        return S_OK;
     });
-    if(FAILED(status)) report_error(view_window_,status,IDS_ERROR_ADD);
+
+    if (FAILED(status)) report_error(view_window_, status, IDS_ERROR_ADD);
     return status;
 }
 HRESULT ShellFolder::GetColumnPropertyList(REFIID iid,void** result) noexcept
@@ -634,9 +809,15 @@ HRESULT ShellFolder::GetSortColumns(SORTCOLUMN* columns,UINT capacity,UINT* coun
     if(!columns || !capacity) return E_INVALIDARG;
     return guarded([&]{
         const auto settings=view_settings();
-        columns[0]={settings.order==ItemOrder::name ? PKEY_ItemNameDisplay : PKEY_ItemDate,
-            settings.descending ? SORT_DESCENDING : SORT_ASCENDING}; *count=1;
-        if(capacity>1 && settings.order==ItemOrder::date) { columns[1]={PKEY_ItemNameDisplay,SORT_ASCENDING}; *count=2; }
+        const auto requested = sort_columns(settings);
+        columns[0] = requested[0];
+        *count = 1;
+
+        if (capacity > 1 && settings.order == ItemOrder::date)
+        {
+            columns[1] = requested[1];
+            *count = 2;
+        }
         return S_OK;
     });
 }

@@ -4,6 +4,11 @@
 
 ### Added
 
+- Native **Manage This PC folders** command in the launcher background menu.
+  Its elevated Win32 dialog adds, names, icons and removes direct This PC folder
+  entries without deleting real folders. It manages the app's current entries.
+- Drop one or more folders onto an empty launcher area to add them directly to
+  This PC. Files and applications still become normal launcher favorites.
 - Native Search and organize dialog with right-aligned labels, grouped controls
   and Windows stock icons; name/path/exact-extension search across references.
 - Extension and editable-family Shell groups, name/date ordering in either
@@ -26,6 +31,17 @@
 
 ### Changed
 
+- Consolidated process launching, Windows argument quoting, module lookup and
+  dialog-text reads; documented asynchronous results and resource ownership.
+- Replaced numeric background-menu dispatch and nested glyph selection with a
+  single command table and named actions. Shared the default/Apply sort columns.
+- Separated view-dialog setup from validation, expanded dense dialog/drop code,
+  and named bitmap color channels and other intermediate results.
+- Removed the old importer and older MDL2 font fallback. The application handles
+  only current registrations; no migration scripts are retained.
+- Made the README shorter and clearer: it now explains why I built the
+  launcher, that Explorer keeps its normal view, and how to group items by
+  section and order them by name.
 - Visible node/shortcut name: **My Computer Enhanced**, always English.
   The project/repository remains MyComputerOnSteroid.
 - Wallpaper/acrylic, its photo control and export/import are outside requested scope.

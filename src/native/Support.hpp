@@ -6,6 +6,7 @@
  * VibeWare participation: Human intent, AI execution, and plenty of tokens
  * Manifesto: https://umbertogiacobbi.biz/vibeware/manifesto
  * Created with AI: OpenAI Codex; native launcher implementation; 2026-10-11.
+ * Modified with AI: OpenAI Codex; shared process and dialog helpers; 2026-10-17.
  * Human guidance: Umberto Giacobbi; standard Shell view, native menus and MSI.
  * Evidence: docs/VALIDATION.md and Git history; no human code review claimed.
  * Copyright (c) 2026 Umberto Giacobbi
@@ -20,6 +21,7 @@
 #include <wrl/client.h>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <filesystem>
 #include <new>
 
@@ -38,6 +40,7 @@ struct HResultError { HRESULT value; };
 inline void check(HRESULT value) { if (FAILED(value)) throw HResultError{value}; }
 inline void check_win32(BOOL success) { if (!success) check(HRESULT_FROM_WIN32(GetLastError())); }
 
+// COM callbacks use this boundary so C++ exceptions become HRESULT failures.
 template<class F> HRESULT guarded(F&& action) noexcept
 {
     try { return action(); }
@@ -71,6 +74,24 @@ inline std::wstring display_name(IShellItem* item, SIGDN kind = SIGDN_NORMALDISP
 }
 
 std::wstring text(UINT resource_id);
+
+// The module containing these helpers: the Shell DLL in Explorer, or the EXE.
+HMODULE current_module();
+std::filesystem::path module_path(HMODULE module);
+
+// Quotes one argument for CommandLineToArgvW, including trailing backslashes.
+std::wstring quote_command_line_argument(std::wstring_view value);
+
+enum class LaunchMode { normal, elevated };
+
+// Starts without waiting. S_FALSE means UAC was cancelled; the process was not
+// started. S_OK confirms launch only, not completion of the child's work.
+HRESULT launch_process(HWND owner, const std::filesystem::path& executable,
+    const std::wstring& arguments, LaunchMode mode = LaunchMode::normal);
+
+// Returns the control's complete text, without its terminating null character.
+std::wstring dialog_text(HWND dialog, UINT control);
+
 void report_error(HWND owner, HRESULT error, UINT operation) noexcept;
 void notify_launcher() noexcept;
 }

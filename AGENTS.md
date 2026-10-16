@@ -39,6 +39,11 @@
   Do not add WPF, .NET, WinUI, Electron or a web runtime to the launcher.
 - Keep the Shell adapter thin. Put favorite storage, classification and policy in
   core components; do not put business rules in menu callbacks or drawing code.
+- Support the current product format only. Do not add importers, migration
+  scripts, old-format readers or platform fallbacks for backward compatibility.
+- Prefer readable blocks, descriptive intermediate variables and one meaningful
+  operation per line. Comment ownership, side effects, failure boundaries and
+  non-obvious algorithms; do not narrate obvious assignments.
 - Prefer the public Shell view interfaces. Do not depend on Explorer's private
   child-window classes, inject into it or claim a modern menu from IContextMenu.
 - Background/acrylic and export/import are outside the owner's current scope.

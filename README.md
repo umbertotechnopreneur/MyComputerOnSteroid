@@ -1,11 +1,16 @@
-# MyComputerOnSteroid
+# MyComputerOnSteroid — Make This PC yours
 
-**A native launcher inside File Explorer for your drives, favorite folders, apps and files.**
+**Keep your drives, favorite folders, apps and files together in File Explorer.**
 
-I keep returning to the same folders and documents between projects. This
-C++20/Win32/COM provider puts their shortcuts beside my drives in Windows'
-standard Shell view. Explorer draws the view and supplies its normal selection,
-icons, list/details modes and sorting.
+## Why I made this
+
+My PC has many drives, folders and projects. This PC showed me the drives, but
+not the places I use all the time. I knew Explorer could show more, so I made a
+small native launcher for it.
+
+This is not a patch or a replacement for Explorer. It uses Explorer's public
+Shell view. Windows still draws the window, icons, lists, sorting and groups.
+MyComputerOnSteroid simply gives that normal view useful things to show.
 
 The visible node is **My Computer Enhanced**, always in English. The project
 and repository keep the name MyComputerOnSteroid.
@@ -41,6 +46,37 @@ Right-click empty space and use Show more options for Add favorite folder/app/fi
 Manage favorite shortcuts, Show recent items, Filter recent items and Restore
 hidden recent items. Select favorite references for Change launcher icon.
 Recent-item commands act on the complete selected set.
+
+## Folders shown directly in This PC
+
+Some folders can sit beside drives in **This PC**, not only inside My Computer
+Enhanced. Drag one or more folders onto an empty area in My Computer Enhanced
+to add them there.
+
+To change those entries, right-click an empty area, choose **Show more options**,
+then **Manage This PC folders**. The small native dialog lets you:
+
+- choose a folder and give it a name;
+- choose an `.ico` file for it;
+- save one entry; or
+- remove one entry without deleting the real folder.
+
+The manager reads its own entries from the registry. Windows asks for
+administrator permission because entries are registered for the user and for the
+machine. It supports the current app format only. It does not restart
+Explorer; close and reopen a This PC window if its old list is still visible.
+
+## Make it tidy
+
+1. Open **My Computer Enhanced** under **This PC**.
+2. Right-click an empty area. Choose **Show more options**, then **Search and
+   organize**.
+3. Choose **Group by: Section** and **Order by: Name**. Choose **Apply**.
+4. Use Explorer's **View** button to choose large, medium or small icons.
+
+You can add a folder, app or file from the same empty-area menu. The launcher
+keeps a reference to it. Removing it from the launcher does not delete the real
+folder, app or file.
 
 ## Search and organize
 
@@ -133,6 +169,7 @@ See [build/install instructions](docs/BUILD.md) and [architecture](docs/ARCHITEC
 ## Development
 
 - [Contributing](CONTRIBUTING.md) and [agent instructions](AGENTS.md).
+- [Readability review and concrete examples](docs/CODE_REVIEW.md).
 - [Open work](.github/tasks/todo.md), [completed work](.github/tasks/archive.md),
   [changelog](CHANGELOG.md) and [engineering lessons](.github/tasks/lessons.md).
 - [AI contribution disclosure](AI_DEVELOPMENT.md) and [asset provenance](docs/IDENTITY.md).
