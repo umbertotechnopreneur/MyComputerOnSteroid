@@ -209,7 +209,8 @@ performed by a receiving application after it obtains filesystem paths.
 
 ## Installation and boundaries
 
-The MSI installs Release binaries under Program Files, registers one root under
+The MSI installs Release binaries under
+`Program Files\Umberto Giacobbi.biz\MyComputerOnSteroid`, registers one root under
 This PC and adds a Start-menu opener. Windows 11 and the matching native x64/ARM64
 architecture are required. Per-user favorites and recent state are not removed
 on uninstall. Developer per-user registration is separate and refuses registration
