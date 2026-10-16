@@ -31,6 +31,7 @@
 
 ### Changed
 
+- Shortened the README and cleanup notes with plain steps and small examples.
 - Consolidated process launching, Windows argument quoting, module lookup and
   dialog-text reads; documented asynchronous results and resource ownership.
 - Replaced numeric background-menu dispatch and nested glyph selection with a

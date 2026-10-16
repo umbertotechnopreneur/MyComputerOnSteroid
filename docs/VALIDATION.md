@@ -8,6 +8,9 @@
   passed 259 assertions. New regressions round-trip empty, quoted, Unicode and
   trailing-backslash arguments through Windows' parser and invoke the recent
   toggle through both public Shell background-menu messages.
+- Windows Server CI does not have the Fluent icon font. The tests verify readable
+  command labels and no font substitution on that host; they explicitly skip
+  glyph pixel assertions there. Local Windows 11 tests still check bitmap pixels.
 - The final x64 0.0.0 MSI passed WiX ICE validation. Packaging did not install it.
 - The manager now reads only the This PC namespace, checks ownership in both
   hives before mutation and updates existing classes in place. These registry

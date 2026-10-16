@@ -165,8 +165,35 @@ void write_test_icon(const std::filesystem::path& path)
     std::ofstream output(path,std::ios::binary);
     output.write(reinterpret_cast<const char*>(bytes.data()),static_cast<std::streamsize>(bytes.size()));
 }
+bool has_fluent_font()
+{
+    const HDC dc = CreateCompatibleDC(nullptr);
+    if (!dc) return false;
+
+    const HFONT font = CreateFontW(-16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        ANTIALIASED_QUALITY, DEFAULT_PITCH, L"Segoe Fluent Icons");
+    if (!font)
+    {
+        DeleteDC(dc);
+        return false;
+    }
+
+    const auto previous = SelectObject(dc, font);
+    wchar_t actual[LF_FACESIZE]{};
+    const bool selected = previous && previous != HGDI_ERROR;
+    const bool available = selected && GetTextFaceW(dc, ARRAYSIZE(actual), actual) &&
+        _wcsicmp(actual, L"Segoe Fluent Icons") == 0;
+
+    if (selected) SelectObject(dc, previous);
+    DeleteObject(font);
+    DeleteDC(dc);
+    return available;
+}
+
 void verify_launcher_icons(HMENU popup,IContextMenu* menu)
 {
+    static const bool font_available = has_fluent_font();
     for(int index=0;index<GetMenuItemCount(popup);++index)
     {
         const UINT command=GetMenuItemID(popup,index);
@@ -174,28 +201,21 @@ void verify_launcher_icons(HMENU popup,IContextMenu* menu)
         wchar_t verb[128]{};
         if(FAILED(menu->GetCommandString(command-1,GCS_VERBW,nullptr,reinterpret_cast<LPSTR>(verb),ARRAYSIZE(verb))) ||
             wcsncmp(verb,L"mcos.",5)!=0) continue;
-        MENUITEMINFOW item{sizeof(item)}; item.fMask=MIIM_BITMAP;
-        if(!GetMenuItemInfoW(popup,command,FALSE,&item) || !item.hbmpItem)
+        MENUITEMINFOW item{sizeof(item)};
+        item.fMask = MIIM_BITMAP;
+
+        // CI runs on Windows Server, which may lack the Windows 11 icon font.
+        // Test the optional-decoration contract there; keep pixel assertions
+        // on hosts with Fluent. Never substitute an older font to pass tests.
+        if (!font_available)
         {
-            std::wcerr<<L"Missing native menu bitmap for "<<verb<<L" at position "<<index<<L"\n";
-            HDC dc=CreateCompatibleDC(nullptr);
-            if(dc)
-            {
-                for(PCWSTR face:{L"Segoe Fluent Icons"})
-                {
-                    HFONT font=CreateFontW(-16,0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
-                        OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,face);
-                    if(!font) continue;
-                    HGDIOBJ previous=SelectObject(dc,font); wchar_t actual[LF_FACESIZE]{};
-                    const wchar_t characters[]{0xed1a,0xe738}; WORD glyphs[]{0xffff,0xffff};
-                    GetTextFaceW(dc,ARRAYSIZE(actual),actual);
-                    GetGlyphIndicesW(dc,characters,2,glyphs,GGI_MARK_NONEXISTING_GLYPHS);
-                    std::wcerr<<L"Font "<<face<<L" maps to "<<actual<<L"; Hide/Remove indices "
-                        <<std::hex<<glyphs[0]<<L"/"<<glyphs[1]<<std::dec<<L"\n";
-                    SelectObject(dc,previous); DeleteObject(font);
-                }
-                DeleteDC(dc);
-            }
+            wchar_t label[256]{};
+            const int length = GetMenuStringW(popup, command, label, ARRAYSIZE(label), MF_BYCOMMAND);
+            require(length > 0, "menu commands retain readable labels without the optional Fluent font");
+            require(GetMenuItemInfoW(popup, command, FALSE, &item) && !item.hbmpItem,
+                "a missing Fluent font does not trigger a legacy font substitution");
+            std::cout << "SKIP: glyph pixel assertions; this host has no Segoe Fluent Icons font\n";
+            continue;
         }
         require(GetMenuItemInfoW(popup,command,FALSE,&item) && item.hbmpItem,"launcher commands have native menu bitmaps");
         DIBSECTION image{};
