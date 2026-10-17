@@ -13,6 +13,7 @@
  * VBWR E */
 
 #include "native/Support.hpp"
+#include "native/ThisPcEntries.hpp"
 #include "core/Catalog.hpp"
 #include "ProjectIdentity.hpp"
 #include "../resources/resource.h"
@@ -30,6 +31,15 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int)
             const auto launched=reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr,L"open",L"explorer.exe",
                 mcos::identity::parsing_name,nullptr,SW_SHOWNORMAL));
             return launched>32 ? S_OK : HRESULT_FROM_WIN32(ERROR_OPEN_FAILED);
+        }
+        if(count==2 && wcscmp(arguments[1],L"--manage-this-pc")==0)
+            return mcos::launch_this_pc_entry_manager();
+        if(count>=3 && wcscmp(arguments[1],L"--add-this-pc")==0)
+        {
+            std::vector<std::wstring> folders;
+            folders.reserve(static_cast<size_t>(count-2));
+            for(int i=2;i<count;++i) folders.emplace_back(arguments[i]);
+            return mcos::add_this_pc_folders(folders);
         }
         mcos::Section section=static_cast<mcos::Section>(0);
         if(wcscmp(arguments[1],L"--folder")==0) section=mcos::Section::folders;

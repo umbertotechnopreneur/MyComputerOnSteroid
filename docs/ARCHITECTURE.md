@@ -11,10 +11,11 @@ normal sorting. The visible name is **My Computer Enhanced**.
 | core/Catalog | Drives; owned favorites; classification, duplicate, rename, icon and removal policy |
 | core/Recents | Optional Windows history source, private cache, filters, dates, pins and hiding |
 | core/ViewSettings | Atomic preferences, target metadata, search and extension-family policy |
-| native/Support | COM/PIDL ownership, HRESULT boundaries, resource strings and diagnostics |
+| native/Support | COM/PIDL ownership, HRESULT boundaries, process/argument helpers, dialog text, resources and diagnostics |
 | native/RecentDialog | Standard Win32 filter dialog: edit, combo, checkbox and buttons |
 | native/ViewDialog | Standard Win32 search/group/order dialog and OS stock icon lifetime |
 | native/MenuIcons | DPI-sized, theme-aware glyph bitmaps owned for native menu lifetime |
+| native/ThisPcEntries | Elevated native dialog and current owned direct This PC folder registrations |
 | shell/ItemId | Validated child PIDLs and delegation to real Shell items |
 | shell/TransferData | Reference Shell identity with document target file-transfer formats |
 | shell/Grouping | Section, extension and editable family category providers |
@@ -100,8 +101,8 @@ failed decoration leaves usable text. File-type icons keep Windows associations.
 ## Native presentation
 
 Custom commands retain native HMENU text/interaction and receive MIIM_BITMAP
-glyphs. Segoe Fluent Icons comes from the installed OS, with Segoe MDL2 Assets
-as a compatibility fallback; no font is redistributed. The public
+glyphs. Segoe Fluent Icons comes from the installed Windows 11 OS; no legacy font
+fallback or redistributed font is included. The public
 [Microsoft glyph table](https://learn.microsoft.com/en-us/windows/apps/design/iconography/segoe-fluent-icons-font)
 defines the selected star, pin, unpin, hide, photo, folder, app, document, filter,
 history and restore symbols. GDI creates premultiplied-alpha bitmaps at the menu
@@ -179,12 +180,16 @@ rather than forwarding arbitrary interfaces that could bypass mutation policy.
 
 Background commands merge through IContextMenuCB. DFM_INVOKECOMMAND and
 DFM_INVOKECOMMANDEX both dispatch add/manage/show/filter/restore actions.
+One command table supplies actions, labels, glyphs and error resources; the
+invocation offset selects that table entry rather than a second numeric mapping.
 Added commands use the classic contract. IContextMenu alone does not establish
 a Windows 11 popup. Actual host/build observations are in [validation](VALIDATION.md).
 
 Drop binds a valid Shell item array/data object, including selections from
-different parents. It negotiates link, or copy if link is unavailable, never move.
-Only references are created. Partial failures preserve references already added.
+different parents. A complete drop of real filesystem folders opens the direct
+This PC manager route; all other drops create launcher references. It negotiates
+link, or copy if link is unavailable, never move. Partial reference failures
+preserve references already added.
 
 Outgoing document transfers wrap two standard Shell data objects. CF_HDROP,
 FileName and descriptor/content formats come from the real filesystem document
@@ -204,11 +209,23 @@ performed by a receiving application after it obtains filesystem paths.
 
 ## Installation and boundaries
 
-The MSI installs Release binaries under Program Files, registers one root under
+The MSI installs Release binaries under
+`Program Files\Umberto Giacobbi.biz\MyComputerOnSteroid`, registers one root under
 This PC and adds a Start-menu opener. Windows 11 and the matching native x64/ARM64
 architecture are required. Per-user favorites and recent state are not removed
 on uninstall. Developer per-user registration is separate and refuses registration
 over a machine MSI installation.
+
+Direct This PC folders are a separate Shell feature from launcher favorites. The
+launcher background menu opens its own standard Win32 manager process. Dropping one
+or more real folders onto an empty launcher area follows the same path and asks for
+one elevation prompt for the complete drop. That process requests elevation, because
+each owned folder needs matching HKCU and HKLM CLSID
+and This PC namespace registrations. It writes only entries marked as owned by
+MyComputerOnSteroid. Add/change/remove never touches the real target folder.
+The application supports only its current MCOS registration format. The registry
+is its source of truth. No importer, migration script, old JSON reader or
+legacy-marker scan is included. The manager does not restart Explorer.
 
 Wallpaper/acrylic and export/import were removed from scope. No custom surface,
 private Explorer hooks, injected controls, managed UI or web runtime is used.

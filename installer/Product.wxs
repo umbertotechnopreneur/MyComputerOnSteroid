@@ -34,6 +34,7 @@ VBWR E -->
     </Condition>
     <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
+        <Directory Id="PublisherFolder" Name="Umberto Giacobbi.biz">
           <Directory Id="INSTALLFOLDER" Name="MyComputerOnSteroid">
             <Component Id="ShellBinary" Guid="{3E7BC318-5824-41B1-AB2C-E2705D1E9A73}" Win64="yes">
               <File Id="ShellDll" Source="$(var.BinDir)\MyComputerOnSteroid.Shell.dll" KeyPath="yes" />
@@ -63,6 +64,7 @@ VBWR E -->
               </RegistryKey>
             </Component>
           </Directory>
+        </Directory>
       </Directory>
       <Directory Id="ProgramMenuFolder">
         <Directory Id="StartFolder" Name="MyComputerOnSteroid">

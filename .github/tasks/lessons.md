@@ -1,5 +1,9 @@
 # Engineering lessons
 
+- Define merged menu actions, labels, glyphs and errors together. Numeric offsets
+  in separate dispatch chains drift when a new command is inserted.
+- Support only the current app format; do not retain importers or migration
+  scripts for older standalone tools.
 - DefView is a Shell view abstraction. Its internal window/control implementation
   is not a public customization contract.
 - IExplorerCommand contributes commands; it does not display the entire modern

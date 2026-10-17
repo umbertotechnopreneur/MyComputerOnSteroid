@@ -49,10 +49,13 @@ public:
     IFACEMETHODIMP GetDetailsOf(PCUITEMID_CHILD,UINT,SHELLDETAILS*) noexcept override;
     IFACEMETHODIMP MapColumnToSCID(UINT,SHCOLUMNID*) noexcept override;
     IFACEMETHODIMP MessageSFVCB(UINT,WPARAM,LPARAM) noexcept override;
+    // Maps Explorer's relative menu offsets through the shared command table.
     IFACEMETHODIMP CallBack(IShellFolder*,HWND,IDataObject*,UINT,WPARAM,LPARAM) noexcept override;
     IFACEMETHODIMP DragEnter(IDataObject*,DWORD,POINTL,DWORD*) noexcept override;
     IFACEMETHODIMP DragOver(DWORD,POINTL,DWORD*) noexcept override;
     IFACEMETHODIMP DragLeave() noexcept override;
+    // Folder-only drops start the manager asynchronously; other drops add owned
+    // favorites. The negotiated effect never moves the original items.
     IFACEMETHODIMP Drop(IDataObject*,DWORD,POINTL,DWORD*) noexcept override;
     IFACEMETHODIMP GetColumnPropertyList(REFIID,void**) noexcept override;
     IFACEMETHODIMP GetGroupByProperty(PROPERTYKEY*,BOOL*) noexcept override;

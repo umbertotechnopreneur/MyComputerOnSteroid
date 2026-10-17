@@ -79,6 +79,29 @@ BEGIN
     IDS_ERROR_VIEW "Could not apply search or view settings. Favorite references and original items were preserved."
     IDS_INVALID_FAMILIES "Use one family per line: Office = docx, xlsx, pptx. Use distinct family names and assign each extension only once. Up to 32 families, 60 characters per name."
     IDS_NO_SEARCH_RESULTS "No launcher items match this search. Right-click and choose Clear launcher search."
+    IDS_MANAGE_THIS_PC "Manage This PC folders..."
+    IDS_ERROR_THIS_PC "Could not update the folders shown directly in This PC. Their real folders were preserved."
+END
+
+IDD_THIS_PC_ENTRIES DIALOGEX 0, 0, 390, 246
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Manage This PC folders"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "Folders shown directly in This PC", -1, 8, 8, 374, 12
+    LISTBOX IDC_THIS_PC_LIST, 8, 23, 374, 78, LBS_NOTIFY | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Name:", -1, 8, 112, 62, 12
+    EDITTEXT IDC_THIS_PC_NAME, 74, 110, 308, 14, ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT "Folder:", -1, 8, 136, 62, 12
+    EDITTEXT IDC_THIS_PC_TARGET, 74, 134, 216, 14, ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON "Choose folder...", IDC_THIS_PC_CHOOSE_FOLDER, 296, 133, 86, 14
+    LTEXT "Icon:", -1, 8, 160, 62, 12
+    EDITTEXT IDC_THIS_PC_ICON, 74, 158, 216, 14, ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON "Choose icon...", IDC_THIS_PC_CHOOSE_ICON, 296, 157, 86, 14
+    LTEXT "Choose a folder, give it a name and choose an icon if you want one. Save changes only this entry; Remove never deletes the real folder.", -1, 8, 184, 374, 24
+    PUSHBUTTON "Remove", IDC_THIS_PC_REMOVE, 8, 222, 58, 14
+    DEFPUSHBUTTON "Save", IDC_THIS_PC_SAVE, 264, 222, 56, 14
+    PUSHBUTTON "Close", IDCANCEL, 326, 222, 56, 14
 END
 
 IDD_VIEW_OPTIONS DIALOGEX 0, 0, 380, 328
@@ -190,6 +213,29 @@ BEGIN
     IDS_ERROR_VIEW "Impossibile applicare la ricerca o le impostazioni della vista. Collegamenti preferiti e originali sono rimasti intatti."
     IDS_INVALID_FAMILIES "Usa una famiglia per riga: Office = docx, xlsx, pptx. I nomi delle famiglie devono essere diversi e ogni estensione può apparire una sola volta. Massimo 32 famiglie, 60 caratteri per nome."
     IDS_NO_SEARCH_RESULTS "Nessun elemento del launcher corrisponde alla ricerca. Tasto destro e Azzera ricerca del launcher per ripristinare gli elementi."
+    IDS_MANAGE_THIS_PC "Gestisci cartelle in Questo PC..."
+    IDS_ERROR_THIS_PC "Impossibile aggiornare le cartelle mostrate direttamente in Questo PC. Le cartelle reali sono rimaste intatte."
+END
+
+IDD_THIS_PC_ENTRIES DIALOGEX 0, 0, 390, 246
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Gestisci cartelle in Questo PC"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "Cartelle mostrate direttamente in Questo PC", -1, 8, 8, 374, 12
+    LISTBOX IDC_THIS_PC_LIST, 8, 23, 374, 78, LBS_NOTIFY | WS_VSCROLL | WS_TABSTOP
+    LTEXT "Nome:", -1, 8, 112, 62, 12
+    EDITTEXT IDC_THIS_PC_NAME, 74, 110, 308, 14, ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT "Cartella:", -1, 8, 136, 62, 12
+    EDITTEXT IDC_THIS_PC_TARGET, 74, 134, 216, 14, ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON "Scegli cartella...", IDC_THIS_PC_CHOOSE_FOLDER, 296, 133, 86, 14
+    LTEXT "Icona:", -1, 8, 160, 62, 12
+    EDITTEXT IDC_THIS_PC_ICON, 74, 158, 216, 14, ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON "Scegli icona...", IDC_THIS_PC_CHOOSE_ICON, 296, 157, 86, 14
+    LTEXT "Scegli una cartella, dai un nome e scegli un'icona se vuoi. Salva modifica solo questa voce; Rimuovi non cancella mai la cartella reale.", -1, 8, 184, 374, 24
+    PUSHBUTTON "Rimuovi", IDC_THIS_PC_REMOVE, 8, 222, 58, 14
+    DEFPUSHBUTTON "Salva", IDC_THIS_PC_SAVE, 264, 222, 56, 14
+    PUSHBUTTON "Chiudi", IDCANCEL, 326, 222, 56, 14
 END
 
 IDD_VIEW_OPTIONS DIALOGEX 0, 0, 380, 328
