@@ -15,13 +15,16 @@
 
 #include "ThisPcEntries.hpp"
 #include "Support.hpp"
+#include "Dialog.hpp"
 #include "../../resources/resource.h"
+#include <CommCtrl.h>
 #include <algorithm>
 #include <array>
 #include <map>
 #include <optional>
 #include <utility>
 #include <vector>
+#include <sddl.h>
 
 namespace mcos
 {
@@ -82,6 +85,15 @@ struct DialogState
 {
     std::vector<ThisPcEntry> entries;
     std::wstring selected_id;
+    HIMAGELIST images{};
+    HICON preview{};
+    bool loading{};
+
+    ~DialogState()
+    {
+        if (images) ImageList_Destroy(images);
+        if (preview) DestroyIcon(preview);
+    }
 };
 
 std::wstring join_registry_path(const wchar_t* root, const std::wstring& child)
@@ -213,6 +225,80 @@ bool is_elevated() noexcept
 HRESULT launch_elevated(const std::wstring& parameters)
 {
     return launch_process(nullptr, module_path(nullptr), parameters, LaunchMode::elevated);
+}
+
+std::wstring current_user_sid()
+{
+    HANDLE token{};
+    check_win32(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token));
+    const std::unique_ptr<void, decltype(&CloseHandle)> owned_token(token, CloseHandle);
+    DWORD bytes{};
+    GetTokenInformation(token, TokenUser, nullptr, 0, &bytes);
+    std::vector<BYTE> storage(bytes);
+    const BOOL read = GetTokenInformation(token, TokenUser, storage.data(), bytes, &bytes);
+    const DWORD error = GetLastError();
+    if (!read) check(HRESULT_FROM_WIN32(error));
+    wchar_t* raw{};
+    check_win32(ConvertSidToStringSidW(reinterpret_cast<TOKEN_USER*>(storage.data())->User.Sid, &raw));
+    const std::unique_ptr<wchar_t, decltype(&LocalFree)> owned(raw, LocalFree);
+    return raw;
+}
+
+// Keep per-user preferences in the normal process. Only a This PC mutation
+// requests UAC, and the worker must retain the same Windows user identity.
+bool run_elevated_worker(HWND dialog, const std::vector<std::wstring>& arguments)
+{
+    std::wstring parameters = L"--this-pc-worker " + quote_command_line_argument(current_user_sid());
+    for (const auto& argument : arguments)
+        parameters += L" " + quote_command_line_argument(argument);
+    const auto executable = module_path(nullptr).wstring();
+    const HWND owner = GetAncestor(dialog, GA_ROOT);
+    SHELLEXECUTEINFOW launch{sizeof(launch)};
+    launch.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+    launch.hwnd = owner;
+    launch.lpVerb = L"runas";
+    launch.lpFile = executable.c_str();
+    launch.lpParameters = parameters.c_str();
+    launch.nShow = SW_HIDE;
+    if (!ShellExecuteExW(&launch))
+    {
+        const DWORD error = GetLastError();
+        if (error == ERROR_CANCELLED) return false;
+        check(HRESULT_FROM_WIN32(error));
+    }
+    if (!launch.hProcess) check(E_UNEXPECTED);
+    const std::unique_ptr<void, decltype(&CloseHandle)> process(launch.hProcess, CloseHandle);
+    struct DisabledOwner
+    {
+        HWND window;
+        explicit DisabledOwner(HWND handle) : window(handle) { EnableWindow(window, FALSE); }
+        ~DisabledOwner() { EnableWindow(window, TRUE); SetActiveWindow(window); }
+    } disabled(owner);
+    bool quit{};
+    int quit_code{};
+    for (;;)
+    {
+        const DWORD wait = MsgWaitForMultipleObjects(1, &launch.hProcess, FALSE, INFINITE, QS_ALLINPUT);
+        if (wait == WAIT_OBJECT_0) break;
+        if (wait != WAIT_OBJECT_0 + 1) check(HRESULT_FROM_WIN32(GetLastError()));
+        MSG message{};
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+        {
+            if (message.message == WM_QUIT)
+            {
+                quit = true;
+                quit_code = static_cast<int>(message.wParam);
+                continue;
+            }
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+    if (quit) PostQuitMessage(quit_code);
+    DWORD result{};
+    check_win32(GetExitCodeProcess(launch.hProcess, &result));
+    check(static_cast<HRESULT>(result));
+    return true;
 }
 
 std::vector<ThisPcEntry> read_entries_from_hive(HKEY hive)
@@ -399,65 +485,145 @@ std::optional<std::wstring> choose_icon(HWND owner)
     return display_name(selected.Get(), SIGDN_FILESYSPATH) + L",0";
 }
 
+// Extract at the monitor's actual size. Handles are owned by the caller; image
+// lists copy their pixels. Unavailable decoration never blocks entry management.
+HICON entry_icon(const std::wstring& location, int pixels)
+{
+    std::array<wchar_t, 32768> path{};
+    const DWORD length = ExpandEnvironmentStringsW(location.c_str(), path.data(), static_cast<DWORD>(path.size()));
+    HICON icon{};
+    if (length && length <= path.size())
+    {
+        const int index = PathParseIconLocationW(path.data());
+        if (!PathIsNetworkPathW(path.data()))
+            SHDefExtractIconW(path.data(), index, 0, &icon, nullptr, MAKELONG(pixels, 0));
+    }
+    if (icon) return icon;
+    SHSTOCKICONINFO stock{sizeof(stock)};
+    if (SUCCEEDED(SHGetStockIconInfo(SIID_FOLDER, SHGSI_ICON | SHGSI_LARGEICON, &stock)))
+    {
+        icon = reinterpret_cast<HICON>(CopyImage(stock.hIcon, IMAGE_ICON, pixels, pixels, 0));
+        DestroyIcon(stock.hIcon);
+    }
+    return icon;
+}
+
+void update_editor(HWND dialog, DialogState& state)
+{
+    if (state.loading) return;
+    const bool editing = !state.selected_id.empty();
+    const bool has_target = !dialog_text(dialog, IDC_THIS_PC_TARGET).empty();
+    const bool has_name = !trim(dialog_text(dialog, IDC_THIS_PC_NAME)).empty();
+    SetDlgItemTextW(dialog, IDC_THIS_PC_MODE, text(editing ? IDS_EDIT_ENTRY : IDS_NEW_ENTRY).c_str());
+    SetDlgItemTextW(dialog, IDC_THIS_PC_SAVE, text(editing ? IDS_SAVE_ENTRY : IDS_ADD_ENTRY).c_str());
+    EnableWindow(GetDlgItem(dialog, IDC_THIS_PC_REMOVE), editing);
+    EnableWindow(GetDlgItem(dialog, IDC_THIS_PC_SAVE), has_target && has_name);
+    EnableWindow(GetDlgItem(dialog, IDC_THIS_PC_CHOOSE_ICON), has_target);
+}
+
+void update_preview(HWND dialog, DialogState& state)
+{
+    const int pixels = MulDiv(32, static_cast<int>(GetDpiForWindow(dialog)), 96);
+    const HICON icon = entry_icon(dialog_text(dialog, IDC_THIS_PC_ICON), pixels);
+    SendDlgItemMessageW(dialog, IDC_THIS_PC_PREVIEW, STM_SETICON, reinterpret_cast<WPARAM>(icon), 0);
+    if (state.preview) DestroyIcon(state.preview);
+    state.preview = icon;
+}
+
 void clear_editor(HWND dialog, DialogState& state)
 {
+    state.loading = true;
     state.selected_id.clear();
     set_control_text(dialog, IDC_THIS_PC_NAME, L"");
     set_control_text(dialog, IDC_THIS_PC_TARGET, L"");
     set_control_text(dialog, IDC_THIS_PC_ICON, L"%SystemRoot%\\System32\\imageres.dll,-3");
-    SendDlgItemMessageW(dialog, IDC_THIS_PC_LIST, LB_SETCURSEL, static_cast<WPARAM>(-1), 0);
+    ListView_SetItemState(GetDlgItem(dialog, IDC_THIS_PC_LIST), -1, 0, LVIS_SELECTED | LVIS_FOCUSED);
+    state.loading = false;
+    update_editor(dialog, state);
+    update_preview(dialog, state);
 }
 
 void reload_entries(HWND dialog, DialogState& state, const std::wstring& selected_id = {})
 {
     state.entries = read_entries();
-    SendDlgItemMessageW(dialog, IDC_THIS_PC_LIST, LB_RESETCONTENT, 0, 0);
+    state.loading = true;
+    const HWND list = GetDlgItem(dialog, IDC_THIS_PC_LIST);
+    ListView_DeleteAllItems(list);
+    const int dpi = static_cast<int>(GetDpiForWindow(dialog));
+    const int pixels = MulDiv(96, dpi, 96);
+    const HIMAGELIST images = ImageList_Create(pixels, pixels, ILC_COLOR32 | ILC_MASK, 1, 8);
+    if (!images) check(E_OUTOFMEMORY);
+    ListView_SetImageList(list, images, LVSIL_NORMAL);
+    if (state.images) ImageList_Destroy(state.images);
+    state.images = images;
+    ListView_SetExtendedListViewStyle(list, LVS_EX_DOUBLEBUFFER | LVS_EX_BORDERSELECT);
+    ListView_SetIconSpacing(list, MulDiv(144, dpi, 96), MulDiv(136, dpi, 96));
     for (size_t index = 0; index < state.entries.size(); ++index)
     {
-        const auto list_index = SendDlgItemMessageW(
-            dialog,
-            IDC_THIS_PC_LIST,
-            LB_ADDSTRING,
-            0,
-            reinterpret_cast<LPARAM>(state.entries[index].name.c_str()));
-        check_win32(list_index != LB_ERR && list_index != LB_ERRSPACE);
-        SendDlgItemMessageW(dialog, IDC_THIS_PC_LIST, LB_SETITEMDATA, static_cast<WPARAM>(list_index), static_cast<LPARAM>(index));
+        const auto& entry = state.entries[index];
+        const HICON icon = entry_icon(entry.icon, pixels);
+        const int image = icon ? ImageList_AddIcon(images, icon) : -1;
+        if (icon) DestroyIcon(icon);
+        LVITEMW item{};
+        item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
+        item.iItem = static_cast<int>(index);
+        item.pszText = const_cast<LPWSTR>(entry.name.c_str());
+        item.iImage = image;
+        item.lParam = static_cast<LPARAM>(index);
+        const int list_index = ListView_InsertItem(list, &item);
+        if (list_index < 0) check(E_FAIL);
         if (state.entries[index].id == selected_id)
-            SendDlgItemMessageW(dialog, IDC_THIS_PC_LIST, LB_SETCURSEL, static_cast<WPARAM>(list_index), 0);
+        {
+            ListView_SetItemState(list, list_index, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+            ListView_EnsureVisible(list, list_index, FALSE);
+        }
     }
+    state.loading = false;
 }
 
 void load_selected_entry(HWND dialog, DialogState& state)
 {
-    const auto selected = SendDlgItemMessageW(dialog, IDC_THIS_PC_LIST, LB_GETCURSEL, 0, 0);
-    if (selected == LB_ERR)
+    if (state.loading) return;
+    const HWND list = GetDlgItem(dialog, IDC_THIS_PC_LIST);
+    const int selected = ListView_GetNextItem(list, -1, LVNI_SELECTED);
+    if (selected < 0)
     {
         clear_editor(dialog, state);
         return;
     }
-    const auto index = SendDlgItemMessageW(dialog, IDC_THIS_PC_LIST, LB_GETITEMDATA, static_cast<WPARAM>(selected), 0);
-    if (index == LB_ERR || static_cast<size_t>(index) >= state.entries.size()) check(E_FAIL);
-    const auto& entry = state.entries[static_cast<size_t>(index)];
+    LVITEMW item{};
+    item.mask = LVIF_PARAM;
+    item.iItem = selected;
+    check_win32(ListView_GetItem(list, &item));
+    const size_t index = static_cast<size_t>(item.lParam);
+    if (index >= state.entries.size()) check(E_FAIL);
+    const auto& entry = state.entries[index];
+    state.loading = true;
     state.selected_id = entry.id;
     set_control_text(dialog, IDC_THIS_PC_NAME, entry.name);
     set_control_text(dialog, IDC_THIS_PC_TARGET, entry.target);
     set_control_text(dialog, IDC_THIS_PC_ICON, entry.icon);
+    state.loading = false;
+    update_editor(dialog, state);
+    update_preview(dialog, state);
 }
 
 void choose_new_folder(HWND dialog, DialogState& state)
 {
     const auto selected = choose_folder(dialog);
     if (!selected) return;
-    clear_editor(dialog, state);
-    set_control_text(dialog, IDC_THIS_PC_NAME, selected->second);
+    // Choosing another target while editing keeps the selected entry's identity.
+    if (state.selected_id.empty()) set_control_text(dialog, IDC_THIS_PC_NAME, selected->second);
     set_control_text(dialog, IDC_THIS_PC_TARGET, selected->first);
+    update_editor(dialog, state);
     SetFocus(GetDlgItem(dialog, IDC_THIS_PC_NAME));
 }
 
-void choose_entry_icon(HWND dialog)
+void choose_entry_icon(HWND dialog, DialogState& state)
 {
     const auto icon = choose_icon(dialog);
     if (icon) set_control_text(dialog, IDC_THIS_PC_ICON, *icon);
+    update_preview(dialog, state);
 }
 
 void save_editor(HWND dialog, DialogState& state)
@@ -478,7 +644,8 @@ void save_editor(HWND dialog, DialogState& state)
     entry.sort_order = existing == state.entries.end()
         ? 80 + static_cast<DWORD>(state.entries.size())
         : existing->sort_order;
-    write_entry(entry);
+    if (is_elevated()) write_entry(entry);
+    else if (!run_elevated_worker(dialog, {L"save", entry.id, entry.name, entry.target, entry.icon})) return;
     notify_this_pc();
     reload_entries(dialog, state, entry.id);
     load_selected_entry(dialog, state);
@@ -491,7 +658,8 @@ void remove_selected_entry(HWND dialog, DialogState& state)
         return candidate.id == state.selected_id;
     });
     if (existing == state.entries.end()) check(E_FAIL);
-    remove_entry(*existing);
+    if (is_elevated()) remove_entry(*existing);
+    else if (!run_elevated_worker(dialog, {L"remove", existing->id})) return;
     notify_this_pc();
     reload_entries(dialog, state);
     clear_editor(dialog, state);
@@ -504,39 +672,58 @@ INT_PTR CALLBACK this_pc_dialog(HWND dialog, UINT message, WPARAM first, LPARAM 
         const auto status = guarded([&] {
             auto* state = reinterpret_cast<DialogState*>(second);
             SetWindowLongPtrW(dialog, DWLP_USER, second);
+            SendDlgItemMessageW(dialog, IDC_THIS_PC_NAME, EM_SETLIMITTEXT, 120, 0);
             reload_entries(dialog, *state);
             clear_editor(dialog, *state);
             return S_OK;
         });
         if (FAILED(status))
         {
-            report_error(dialog, status, IDS_ERROR_THIS_PC);
-            EndDialog(dialog, IDCANCEL);
+            fail_native_dialog(dialog, status);
         }
-        return TRUE;
-    }
-
-    if (message != WM_COMMAND) return FALSE;
-    if (LOWORD(first) == IDCANCEL)
-    {
-        EndDialog(dialog, IDCANCEL);
         return TRUE;
     }
 
     auto* state = reinterpret_cast<DialogState*>(GetWindowLongPtrW(dialog, DWLP_USER));
     if (!state) return FALSE;
+    if (message == WM_NOTIFY)
+    {
+        const auto* notice = reinterpret_cast<NMHDR*>(second);
+        if (notice->idFrom != IDC_THIS_PC_LIST || notice->code != LVN_ITEMCHANGED) return FALSE;
+        const auto* change = reinterpret_cast<NMLISTVIEW*>(second);
+        if (!(change->uChanged & LVIF_STATE) || !(change->uNewState & LVIS_SELECTED)) return FALSE;
+        const auto status = guarded([&] { load_selected_entry(dialog, *state); return S_OK; });
+        if (FAILED(status)) report_error(dialog, status, IDS_ERROR_THIS_PC);
+        return TRUE;
+    }
+    if (message == WM_APP + 19)
+    {
+        const auto status = guarded([&] {
+            const auto selected = state->selected_id;
+            reload_entries(dialog, *state, selected);
+            update_preview(dialog, *state);
+            return S_OK;
+        });
+        if (FAILED(status)) report_error(dialog, status, IDS_ERROR_THIS_PC);
+        return TRUE;
+    }
+    if (message != WM_COMMAND) return FALSE;
 
     const auto status = guarded([&] {
         switch (LOWORD(first))
         {
-        case IDC_THIS_PC_LIST:
-            if (HIWORD(first) == LBN_SELCHANGE) load_selected_entry(dialog, *state);
+        case IDC_THIS_PC_NAME:
+            if (HIWORD(first) == EN_CHANGE) update_editor(dialog, *state);
+            return S_OK;
+        case IDC_THIS_PC_NEW:
+            clear_editor(dialog, *state);
+            choose_new_folder(dialog, *state);
             return S_OK;
         case IDC_THIS_PC_CHOOSE_FOLDER:
             choose_new_folder(dialog, *state);
             return S_OK;
         case IDC_THIS_PC_CHOOSE_ICON:
-            choose_entry_icon(dialog);
+            choose_entry_icon(dialog, *state);
             return S_OK;
         case IDC_THIS_PC_SAVE:
             save_editor(dialog, *state);
@@ -553,20 +740,51 @@ INT_PTR CALLBACK this_pc_dialog(HWND dialog, UINT message, WPARAM first, LPARAM 
 }
 }
 
-HRESULT launch_this_pc_entry_manager()
-{
-    return guarded([] {
-        if (!is_elevated())
-            return launch_elevated(L"--manage-this-pc");
 
-        DialogState state;
-        const auto result = DialogBoxParamW(
-            GetModuleHandleW(nullptr),
-            MAKEINTRESOURCEW(IDD_THIS_PC_ENTRIES),
-            GetDesktopWindow(),
-            this_pc_dialog,
-            reinterpret_cast<LPARAM>(&state));
-        if (result == -1) check(HRESULT_FROM_WIN32(GetLastError()));
+std::unique_ptr<NativeDialogPage> create_this_pc_page(HWND parent)
+{
+    auto state = std::make_shared<DialogState>();
+    const DialogAnchor anchors[]{
+        {IDC_DIALOG_HEADING, true}, {IDC_THIS_PC_DESCRIPTION, true}, {IDC_DIALOG_HEADER_LINE, true},
+        {IDC_THIS_PC_LIST, false, false, true}, {IDC_THIS_PC_MODE, true},
+        {IDC_THIS_PC_NAME, true}, {IDC_THIS_PC_TARGET, true},
+        {IDC_THIS_PC_CHOOSE_FOLDER, false, true},
+        {IDC_THIS_PC_ICON, true}, {IDC_THIS_PC_CHOOSE_ICON, false, true},
+        {IDC_DIALOG_FOOTER_LINE, true, false, false, true},
+        {IDC_THIS_PC_NEW, false, false, false, true}, {IDC_THIS_PC_REMOVE, false, false, false, true},
+        {IDC_THIS_PC_SAVE, false, true, false, true}};
+    return NativeDialogPage::create(IDD_THIS_PC_ENTRIES, parent, this_pc_dialog,
+        reinterpret_cast<LPARAM>(state.get()), anchors, state);
+}
+
+HRESULT run_this_pc_worker(const std::vector<std::wstring>& arguments)
+{
+    return guarded([&] {
+        if (!is_elevated() || arguments.size() < 3 || arguments[0] != current_user_sid()) return E_ACCESSDENIED;
+        const auto& id = arguments[2];
+        GUID parsed{};
+        if (id.size() != 38 || id.front() != L'{' || id.back() != L'}' || FAILED(CLSIDFromString(id.c_str(), &parsed)))
+            return E_INVALIDARG;
+        auto entries = read_entries();
+        const auto existing = std::find_if(entries.begin(), entries.end(), [&](const ThisPcEntry& candidate) {
+            return _wcsicmp(candidate.id.c_str(), id.c_str()) == 0;
+        });
+        if (arguments[1] == L"remove" && arguments.size() == 3)
+        {
+            if (existing == entries.end()) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+            remove_entry(*existing);
+        }
+        else if (arguments[1] == L"save" && arguments.size() == 6)
+        {
+            ThisPcEntry entry{id, trim(arguments[3]), trim(arguments[4]), trim(arguments[5]),
+                existing == entries.end() ? 80 + static_cast<DWORD>(entries.size()) : existing->sort_order};
+            if (entry.name.empty() || entry.name.size() > 120 || entry.target.empty() || entry.icon.empty()) return E_INVALIDARG;
+            const DWORD attributes = GetFileAttributesW(entry.target.c_str());
+            if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY)) return E_INVALIDARG;
+            write_entry(entry);
+        }
+        else return E_INVALIDARG;
+        notify_this_pc();
         return S_OK;
     });
 }

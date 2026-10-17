@@ -33,6 +33,8 @@ struct RecentInfo
 };
 
 RecentSettings recent_settings();
+// Validation has no I/O, so a settings host can validate every page before saving.
+void validate_recent_settings(const RecentSettings& settings);
 void save_recent_settings(const RecentSettings& settings);
 std::vector<CatalogItem> enumerate_recents();
 bool is_owned_recent(const CatalogItem& item);

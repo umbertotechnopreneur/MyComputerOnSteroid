@@ -71,30 +71,27 @@ void verify_background_menu(IShellFolder2* folder)
     const auto merged = callback->CallBack(folder, nullptr, nullptr, DFM_MERGECONTEXTMENU,
         0, reinterpret_cast<LPARAM>(&info));
 
-    UINT toggle_id = 0;
-    bool has_this_pc_manager = false;
-    const auto toggle_label = text(IDS_RECENT_SHOW);
-    const auto manager_label = text(IDS_MANAGE_THIS_PC);
+    UINT configure_id{};
+    int command_count{};
+    const auto configure_label = text(IDS_CONFIGURE);
     for (int index = 0; index < GetMenuItemCount(menu); ++index)
     {
         wchar_t label[256]{};
         GetMenuStringW(menu, static_cast<UINT>(index), label, ARRAYSIZE(label), MF_BYPOSITION);
-        if (toggle_label == label) toggle_id = GetMenuItemID(menu, index);
-        if (manager_label == label) has_this_pc_manager = true;
+        const UINT command = GetMenuItemID(menu, index);
+        if (command >= first_id && command <= first_id + 100) ++command_count;
+        if (configure_label == label) configure_id = command;
     }
     DestroyMenu(menu);
     check(merged);
-    require(has_this_pc_manager && toggle_id >= first_id,
-        "background menu contains direct This PC management and the recent toggle");
+    require(configure_id == first_id && command_count == 1 && info.idCmdFirst == first_id + 1,
+        "background settings expose exactly one localized Configure command");
 
-    const bool initially_enabled = recent_settings().enabled;
-    const auto offset = toggle_id - first_id;
-    check(callback->CallBack(folder, nullptr, nullptr, DFM_INVOKECOMMAND, offset, 0));
-    require(recent_settings().enabled != initially_enabled,
-        "a merged menu offset dispatches its named action after inserting a command");
-    check(callback->CallBack(folder, nullptr, nullptr, DFM_INVOKECOMMANDEX, offset, 0));
-    require(recent_settings().enabled == initially_enabled,
-        "both public Shell invocation messages dispatch the same background action");
+    // Do not invoke Configure: this regression remains noninteractive.
+    require(callback->CallBack(folder, nullptr, nullptr, DFM_INVOKECOMMAND, 1, 0) == S_FALSE,
+        "obsolete background command offsets are not dispatched");
+    require(callback->CallBack(folder, nullptr, nullptr, DFM_INVOKECOMMANDEX, 1, 0) == S_FALSE,
+        "extended invocation also rejects obsolete background offsets");
 }
 
 std::string contents(const std::filesystem::path& path)

@@ -14,6 +14,7 @@
  * VBWR E */
 
 #include "RecentDialog.hpp"
+#include "Dialog.hpp"
 #include "../core/Recents.hpp"
 #include "../../resources/resource.h"
 
@@ -21,6 +22,20 @@ namespace mcos
 {
 namespace
 {
+HRESULT read_filters(HWND dialog, RecentSettings& settings)
+{
+    auto pending = settings;
+    pending.enabled = IsDlgButtonChecked(dialog, IDC_RECENT_ENABLED) == BST_CHECKED;
+    pending.name = dialog_text(dialog, IDC_RECENT_NAME);
+    pending.extension = dialog_text(dialog, IDC_RECENT_EXTENSION);
+    const auto category = SendDlgItemMessageW(dialog, IDC_RECENT_CATEGORY, CB_GETCURSEL, 0, 0);
+    if (category < 0 || category > static_cast<LRESULT>(RecentCategory::other)) return E_INVALIDARG;
+    pending.category = static_cast<RecentCategory>(category);
+    validate_recent_settings(pending);
+    settings = std::move(pending);
+    return S_OK;
+}
+
 INT_PTR CALLBACK filter_dialog(HWND dialog, UINT message, WPARAM first, LPARAM second) noexcept
 {
     if (message == WM_INITDIALOG)
@@ -46,50 +61,42 @@ INT_PTR CALLBACK filter_dialog(HWND dialog, UINT message, WPARAM first, LPARAM s
         });
         if (FAILED(status))
         {
-            report_error(dialog, status, IDS_ERROR_RECENTS);
-            EndDialog(dialog, IDCANCEL);
+            fail_native_dialog(dialog, status);
         }
+        return TRUE;
+    }
+    if (message == ReadDialogPage)
+    {
+        auto* result = reinterpret_cast<HRESULT*>(second);
+        if (!result) return FALSE;
+        *result = guarded([&] {
+            auto* settings = reinterpret_cast<RecentSettings*>(GetWindowLongPtrW(dialog, DWLP_USER));
+            return settings ? read_filters(dialog, *settings) : E_UNEXPECTED;
+        });
         return TRUE;
     }
     if (message == WM_COMMAND)
     {
-        if (LOWORD(first) == IDCANCEL)
+        if (LOWORD(first) == IDC_RECENT_RESTORE)
         {
-            EndDialog(dialog, IDCANCEL);
-            return TRUE;
-        }
-        if (LOWORD(first) == IDOK)
-        {
-            const auto status = guarded([&] {
-                auto* settings = reinterpret_cast<RecentSettings*>(GetWindowLongPtrW(dialog, DWLP_USER));
-                if (!settings) return E_UNEXPECTED;
-
-                // Read all controls before assigning or saving the edited state.
-                auto pending = *settings;
-                pending.enabled = IsDlgButtonChecked(dialog, IDC_RECENT_ENABLED) == BST_CHECKED;
-                pending.name = dialog_text(dialog, IDC_RECENT_NAME);
-                pending.extension = dialog_text(dialog, IDC_RECENT_EXTENSION);
-                const auto category = SendDlgItemMessageW(dialog, IDC_RECENT_CATEGORY, CB_GETCURSEL, 0, 0);
-                if (category < 0) return E_INVALIDARG;
-
-                pending.category = static_cast<RecentCategory>(category);
-                save_recent_settings(pending);
-                *settings = std::move(pending);
-                return S_OK;
-            });
+            const auto status = guarded([] { restore_hidden_recents(); return S_OK; });
             if (FAILED(status)) report_error(dialog, status, IDS_ERROR_RECENTS);
-            else EndDialog(dialog, IDOK);
             return TRUE;
         }
     }
     return FALSE;
 }
+
 }
-void choose_recent_filters(HWND owner)
+
+std::unique_ptr<NativeDialogPage> create_recent_page(HWND parent, RecentSettings& settings)
 {
-    auto settings = recent_settings();
-    const auto result = DialogBoxParamW(current_module(), MAKEINTRESOURCEW(IDD_RECENT_FILTERS),
-        owner, filter_dialog, reinterpret_cast<LPARAM>(&settings));
-    if (result == -1) check(HRESULT_FROM_WIN32(GetLastError()));
+    const DialogAnchor anchors[]{
+        {IDC_DIALOG_HEADING, true}, {IDC_RECENT_DESCRIPTION, true}, {IDC_DIALOG_HEADER_LINE, true},
+        {IDC_RECENT_ENABLED, true}, {IDC_RECENT_NAME, true}, {IDC_RECENT_CATEGORY, true},
+        {IDC_DIALOG_FOOTER_LINE, true, false, false, true},
+        {IDC_RECENT_RESTORE, false, false, false, true}};
+    return NativeDialogPage::create(IDD_RECENT_FILTERS, parent, filter_dialog,
+        reinterpret_cast<LPARAM>(&settings), anchors);
 }
 }

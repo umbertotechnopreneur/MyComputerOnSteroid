@@ -13,6 +13,7 @@
  * VBWR E */
 
 #include "Catalog.hpp"
+#include "../native/Dialog.hpp"
 #include "Recents.hpp"
 #include "../../resources/resource.h"
 #include <algorithm>
@@ -287,6 +288,7 @@ void change_favorite_icon(const CatalogItem& item, const std::filesystem::path& 
 
 void choose_favorite_icon(HWND owner, const std::vector<CatalogItem>& items)
 {
+    NativeUiScope ui;
     if (items.empty()) check(E_INVALIDARG);
     for (const auto& item : items) if (!is_owned_favorite(item)) check(E_ACCESSDENIED);
     ComPtr<IFileOpenDialog> dialog;
@@ -327,6 +329,7 @@ std::wstring item_name(const CatalogItem& item)
 
 void choose_favorite(HWND owner, Section section)
 {
+    NativeUiScope ui;
     ComPtr<IFileOpenDialog> dialog;
     check(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)));
     FILEOPENDIALOGOPTIONS options{};

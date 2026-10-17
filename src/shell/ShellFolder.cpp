@@ -20,8 +20,7 @@
 #include "FavoriteMenu.hpp"
 #include "../core/Recents.hpp"
 #include "../core/ViewSettings.hpp"
-#include "../native/RecentDialog.hpp"
-#include "../native/ViewDialog.hpp"
+#include "../native/Dialog.hpp"
 #include "../ProjectIdentity.hpp"
 #include "../../resources/resource.h"
 #include <Propkey.h>
@@ -30,26 +29,12 @@
 #include <CommCtrl.h>
 #include <algorithm>
 #include <array>
-#include <ExDisp.h>
-#include <ShlGuid.h>
 
 namespace mcos::shell
 {
 namespace
 {
-enum class BackgroundAction
-{
-    add_folder,
-    add_app,
-    add_file,
-    manage_this_pc,
-    manage_favorites,
-    filter_recents,
-    toggle_recents,
-    restore_recents,
-    organize,
-    clear_search
-};
+enum class BackgroundAction { configure };
 
 struct BackgroundCommand
 {
@@ -59,19 +44,9 @@ struct BackgroundCommand
     UINT error_label;
 };
 
-// Explorer invokes an offset into the merged commands. Keep ordering, labels,
-// decoration and error messages in one table so inserting a command is safe.
+// Settings belong to the configuration window, not a growing background menu.
 constexpr std::array BackgroundCommands{
-    BackgroundCommand{BackgroundAction::add_folder, IDS_ADD_FOLDER, MenuGlyph::folder, IDS_ERROR_ADD},
-    BackgroundCommand{BackgroundAction::add_app, IDS_ADD_APP, MenuGlyph::apps, IDS_ERROR_ADD},
-    BackgroundCommand{BackgroundAction::add_file, IDS_ADD_FILE, MenuGlyph::document, IDS_ERROR_ADD},
-    BackgroundCommand{BackgroundAction::manage_this_pc, IDS_MANAGE_THIS_PC, MenuGlyph::folder_open, IDS_ERROR_THIS_PC},
-    BackgroundCommand{BackgroundAction::manage_favorites, IDS_MANAGE, MenuGlyph::folder_open, IDS_ERROR_ADD},
-    BackgroundCommand{BackgroundAction::filter_recents, IDS_RECENT_FILTERS, MenuGlyph::filter, IDS_ERROR_RECENTS},
-    BackgroundCommand{BackgroundAction::toggle_recents, IDS_RECENT_SHOW, MenuGlyph::history, IDS_ERROR_RECENTS},
-    BackgroundCommand{BackgroundAction::restore_recents, IDS_RECENT_RESTORE, MenuGlyph::restore, IDS_ERROR_RECENTS},
-    BackgroundCommand{BackgroundAction::organize, IDS_VIEW_OPTIONS, MenuGlyph::search, IDS_ERROR_VIEW},
-    BackgroundCommand{BackgroundAction::clear_search, IDS_CLEAR_SEARCH, MenuGlyph::restore, IDS_ERROR_VIEW}
+    BackgroundCommand{BackgroundAction::configure, IDS_CONFIGURE, MenuGlyph::settings, IDS_ERROR_CONFIGURATION}
 };
 
 const BackgroundCommand* background_command(WPARAM offset) noexcept
@@ -84,10 +59,6 @@ std::filesystem::path launcher_path()
     return module_path(current_module()).parent_path() / L"MyComputerOnSteroid.exe";
 }
 
-HRESULT open_this_pc_entry_manager(HWND owner)
-{
-    return launch_process(owner, launcher_path(), L"--manage-this-pc");
-}
 
 HRESULT add_dropped_folders_to_this_pc(HWND owner, IShellItemArray* items)
 {
@@ -202,32 +173,6 @@ PROPERTYKEY group_key(GroupMode mode) noexcept
     default: return PKEY_ItemTypeText;
     }
 }
-ComPtr<IShellView> active_view(HWND owner,PCIDLIST_ABSOLUTE root)
-{
-    // Find our host through public Shell automation/services, never private HWND
-    // classes. Hold the view only for the command; retaining it in its folder
-    // would create a COM lifetime cycle.
-    if(!owner || !root) check(E_UNEXPECTED);
-    const auto top=GetAncestor(owner,GA_ROOT);
-    ComPtr<IShellWindows> windows; check(CoCreateInstance(CLSID_ShellWindows,nullptr,CLSCTX_LOCAL_SERVER,IID_PPV_ARGS(&windows)));
-    long count{}; check(windows->get_Count(&count));
-    for(long i=0;i<count;++i)
-    {
-        VARIANT index{}; index.vt=VT_I4; index.lVal=i;
-        ComPtr<IDispatch> entry;
-        if(FAILED(windows->Item(index,&entry)) || !entry) continue;
-        ComPtr<IWebBrowser2> browser; SHANDLE_PTR hwnd{};
-        if(FAILED(entry.As(&browser)) || FAILED(browser->get_HWND(&hwnd)) || reinterpret_cast<HWND>(hwnd)!=top) continue;
-        ComPtr<IServiceProvider> services; ComPtr<IShellBrowser> host; ComPtr<IShellView> view;
-        if(FAILED(browser.As(&services)) || FAILED(services->QueryService(SID_STopLevelBrowser,IID_PPV_ARGS(&host))) ||
-           FAILED(host->QueryActiveShellView(&view))) continue;
-        ComPtr<IFolderView> folder_view; ComPtr<IPersistFolder2> folder; PIDLIST_ABSOLUTE actual{};
-        if(FAILED(view.As(&folder_view)) || FAILED(folder_view->GetFolder(IID_PPV_ARGS(&folder))) ||
-           FAILED(folder->GetCurFolder(&actual))) continue;
-        Pidl current(actual); if(ILIsEqual(root,current.get())) return view;
-    }
-    check(E_NOINTERFACE); return {};
-}
 std::array<SORTCOLUMN, 2> sort_columns(const ViewSettings& settings)
 {
     const auto primary_key = settings.order == ItemOrder::name ? PKEY_ItemNameDisplay : PKEY_ItemDate;
@@ -235,76 +180,10 @@ std::array<SORTCOLUMN, 2> sort_columns(const ViewSettings& settings)
     return {SORTCOLUMN{primary_key, direction}, SORTCOLUMN{PKEY_ItemNameDisplay, SORT_ASCENDING}};
 }
 
-void apply_view(IShellView* shell_view, const ViewSettings& settings)
+HRESULT invoke_background_command(HWND owner, PCIDLIST_ABSOLUTE, BackgroundAction)
 {
-    ComPtr<IFolderView2> view;
-    check(shell_view->QueryInterface(IID_PPV_ARGS(&view)));
-    check(view->SetGroupBy(group_key(settings.grouping), TRUE));
-
-    const auto columns = sort_columns(settings);
-    const int count = settings.order == ItemOrder::date ? 2 : 1;
-    check(view->SetSortColumns(columns.data(), count));
-
-    const auto empty_text = settings.query.empty() ? L"" : text(IDS_NO_SEARCH_RESULTS);
-    check(view->SetText(FVST_EMPTYTEXT, empty_text.c_str()));
-    check(shell_view->Refresh());
-}
-
-HRESULT invoke_background_command(HWND owner, PCIDLIST_ABSOLUTE root, BackgroundAction action)
-{
-    switch (action)
-    {
-    case BackgroundAction::add_folder:
-        choose_favorite(owner, Section::folders);
-        return S_OK;
-    case BackgroundAction::add_app:
-        choose_favorite(owner, Section::apps);
-        return S_OK;
-    case BackgroundAction::add_file:
-        choose_favorite(owner, Section::files);
-        return S_OK;
-    case BackgroundAction::manage_this_pc:
-        return open_this_pc_entry_manager(owner);
-    case BackgroundAction::manage_favorites:
-    {
-        const auto path = data_root() / L"Favorites";
-        std::filesystem::create_directories(path);
-        return launch_process(owner, path, L"");
-    }
-    case BackgroundAction::filter_recents:
-        choose_recent_filters(owner);
-        return S_OK;
-    case BackgroundAction::toggle_recents:
-    {
-        auto settings = recent_settings();
-        settings.enabled = !settings.enabled;
-        save_recent_settings(settings);
-        return S_OK;
-    }
-    case BackgroundAction::restore_recents:
-        restore_hidden_recents();
-        return S_OK;
-    case BackgroundAction::organize:
-    case BackgroundAction::clear_search:
-    {
-        auto settings = view_settings();
-        const auto view = active_view(owner, root);
-
-        if (action == BackgroundAction::organize)
-        {
-            if (!choose_view_settings(owner, settings)) return S_OK;
-        }
-        else
-        {
-            settings.query.clear();
-        }
-
-        save_view_settings(settings);
-        apply_view(view.Get(), settings);
-        return S_OK;
-    }
-    }
-    return S_FALSE;
+    return launch_process(owner, launcher_path(),
+        L"--configure" + dialog_origin_arguments(dialog_origin(owner)));
 }
 std::wstring detail(const CatalogItem& item,UINT column)
 {
@@ -695,16 +574,12 @@ HRESULT ShellFolder::CallBack(IShellFolder*,HWND owner,IDataObject*,UINT message
             if (!menu) return E_POINTER;
             if (first & CMF_DEFAULTONLY) return S_OK;
 
-            const bool show_recents = recent_settings().enabled;
-            const bool search_is_empty = view_settings().query.empty();
 
             for (const auto& command : BackgroundCommands)
             {
                 if (menu->idCmdFirst > menu->idCmdLast) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
 
-                UINT flags = MF_BYPOSITION | MF_STRING;
-                if (command.action == BackgroundAction::toggle_recents && show_recents) flags |= MF_CHECKED;
-                if (command.action == BackgroundAction::clear_search && search_is_empty) flags |= MF_GRAYED;
+                const UINT flags = MF_BYPOSITION | MF_STRING;
 
                 const UINT command_id = menu->idCmdFirst++;
                 const auto label = text(command.label);

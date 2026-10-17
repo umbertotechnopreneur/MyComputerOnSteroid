@@ -13,4 +13,8 @@
  * VBWR E */
 #pragma once
 #include "../core/ViewSettings.hpp"
-namespace mcos { bool choose_view_settings(HWND owner, ViewSettings& settings); }
+#include "Dialog.hpp"
+namespace mcos
+{
+std::unique_ptr<NativeDialogPage> create_view_page(HWND parent, ViewSettings& settings);
+}

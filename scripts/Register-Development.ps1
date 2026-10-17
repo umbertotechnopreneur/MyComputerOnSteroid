@@ -48,6 +48,7 @@ foreach ($file in @('MyComputerOnSteroid.Shell.dll', 'MyComputerOnSteroid.exe'))
 $destination = Join-Path $env:LOCALAPPDATA ('MyComputerOnSteroid\Development\' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $source 'MyComputerOnSteroid.Shell.dll'), (Join-Path $source 'MyComputerOnSteroid.exe') -Destination $destination
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../resources/Readme Setup.txt') -Destination $destination
 function Ensure-RegistrationKey([string] $Path) {
     # New-Item -Force clears existing registry subkeys; keep owned registrations intact.
     if (-not (Test-Path -LiteralPath $Path)) { New-Item -Path $Path | Out-Null }
@@ -62,7 +63,12 @@ $server = Ensure-RegistrationKey "$classPath\InprocServer32"
 Set-Item -LiteralPath $server.PSPath -Value (Join-Path $destination 'MyComputerOnSteroid.Shell.dll')
 New-ItemProperty -LiteralPath $server.PSPath -Name ThreadingModel -Value Apartment -PropertyType String -Force | Out-Null
 $icon = Ensure-RegistrationKey "$classPath\DefaultIcon"
-Set-Item -LiteralPath $icon.PSPath -Value "$env:SystemRoot\System32\imageres.dll,-109"
+Set-Item -LiteralPath $icon.PSPath -Value ((Join-Path $destination 'MyComputerOnSteroid.exe') + ',0')
+$configure = Ensure-RegistrationKey "$classPath\shell\mcos.configure"
+New-ItemProperty -LiteralPath $configure.PSPath -Name MUIVerb -Value ('@' + (Join-Path $destination 'MyComputerOnSteroid.exe') + ',-302') -PropertyType String -Force | Out-Null
+New-ItemProperty -LiteralPath $configure.PSPath -Name Icon -Value ((Join-Path $destination 'MyComputerOnSteroid.exe') + ',0') -PropertyType String -Force | Out-Null
+$configureCommand = Ensure-RegistrationKey "$classPath\shell\mcos.configure\command"
+Set-Item -LiteralPath $configureCommand.PSPath -Value ('"' + (Join-Path $destination 'MyComputerOnSteroid.exe') + '" --configure')
 $folder = Ensure-RegistrationKey "$classPath\ShellFolder"
 New-ItemProperty -LiteralPath $folder.PSPath -Name Attributes -Value ([int]::Parse('A8000110',[Globalization.NumberStyles]::HexNumber)) -PropertyType DWord -Force | Out-Null
 New-ItemProperty -LiteralPath $classPath -Name System.IsPinnedToNameSpaceTree -Value 1 -PropertyType DWord -Force | Out-Null

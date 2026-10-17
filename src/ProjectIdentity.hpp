@@ -24,6 +24,7 @@ inline constexpr wchar_t parsing_name[] = L"::{20D04FE0-3AEA-1069-A2D8-08002B303
 inline constexpr wchar_t creator[] = L"Umberto Giacobbi";
 inline constexpr wchar_t publisher[] = L"umbertogiacobbi.biz";
 inline constexpr wchar_t website[] = L"https://umbertogiacobbi.biz";
+inline constexpr wchar_t repository[] = L"https://github.com/umbertotechnopreneur/MyComputerOnSteroid";
 inline constexpr wchar_t manifesto[] = L"https://umbertogiacobbi.biz/vibeware/manifesto";
 
 // Stable identity of the launcher root. Favorites do not each receive a CLSID.

@@ -14,12 +14,14 @@
  * VBWR E */
 
 #include "Support.hpp"
+#include "Dialog.hpp"
 #include "../ProjectIdentity.hpp"
 #include "../core/Catalog.hpp"
 #include "../../resources/resource.h"
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <vector>
 
 namespace mcos
 {
@@ -92,12 +94,52 @@ std::wstring dialog_text(HWND dialog, UINT control)
     return value;
 }
 
+LANGID ui_language()
+{
+    ULONG count{};
+    ULONG characters{};
+    check_win32(GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &count, nullptr, &characters));
+    std::vector<wchar_t> names(characters);
+    check_win32(GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &count, names.data(), &characters));
+    for (const wchar_t* name = names.data(); *name; name += wcslen(name) + 1)
+    {
+        const std::wstring_view language(name);
+        const auto starts = [&](std::wstring_view prefix) {
+            return language.size() >= prefix.size() &&
+                _wcsnicmp(language.data(), prefix.data(), prefix.size()) == 0 &&
+                (language.size() == prefix.size() || language[prefix.size()] == L'-');
+        };
+        if (starts(L"it")) return MAKELANGID(LANG_ITALIAN, SUBLANG_DEFAULT);
+        if (starts(L"en")) return MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
+        if (starts(L"vi")) return MAKELANGID(LANG_VIETNAMESE, SUBLANG_DEFAULT);
+        if (starts(L"fr")) return MAKELANGID(LANG_FRENCH, SUBLANG_FRENCH);
+        if (starts(L"de")) return MAKELANGID(LANG_GERMAN, SUBLANG_GERMAN);
+        if (starts(L"es")) return MAKELANGID(LANG_SPANISH, SUBLANG_SPANISH_MODERN);
+        if (starts(L"yue") || starts(L"zh-HK") || starts(L"zh-MO"))
+            return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_HONGKONG);
+        if (starts(L"zh")) return MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED);
+    }
+    return MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
+}
+
 std::wstring text(UINT id)
 {
-    wchar_t* raw = nullptr;
-    const int length = LoadStringW(current_module(), id, reinterpret_cast<LPWSTR>(&raw), 0);
-    if (length <= 0) check(HRESULT_FROM_WIN32(ERROR_RESOURCE_NAME_NOT_FOUND));
-    return std::wstring(raw, static_cast<size_t>(length));
+    const auto module = current_module();
+    const auto resource = FindResourceExW(module, RT_STRING, MAKEINTRESOURCEW(id / 16 + 1), ui_language());
+    if (!resource) check(HRESULT_FROM_WIN32(ERROR_RESOURCE_NAME_NOT_FOUND));
+    const auto loaded = LoadResource(module, resource);
+    if (!loaded) check(HRESULT_FROM_WIN32(GetLastError()));
+    const auto* value = static_cast<const wchar_t*>(LockResource(loaded));
+    if (!value) check(HRESULT_FROM_WIN32(ERROR_RESOURCE_DATA_NOT_FOUND));
+    const auto* end = value + SizeofResource(module, resource) / sizeof(wchar_t);
+    for (UINT index = 0; index < id % 16; ++index)
+    {
+        if (value >= end || value + 1 + *value > end) check(E_UNEXPECTED);
+        value += 1 + *value;
+    }
+    if (value >= end || !*value || value + 1 + *value > end)
+        check(HRESULT_FROM_WIN32(ERROR_RESOURCE_NAME_NOT_FOUND));
+    return std::wstring(value + 1, *value);
 }
 
 void report_error(HWND owner, HRESULT error, UINT operation) noexcept
@@ -116,7 +158,10 @@ void report_error(HWND owner, HRESULT error, UINT operation) noexcept
                 << now.wHour << L":" << now.wMinute << L" " << message.str() << L"\n";
             return S_OK;
         }); // A failed log write must not suppress the visible error.
-        if (owner) MessageBoxW(owner, message.str().c_str(), identity::launcher_name, MB_OK | MB_ICONERROR);
+        if (owner)
+        {
+            show_native_message(owner, message.str());
+        }
         return S_OK;
     });
 }

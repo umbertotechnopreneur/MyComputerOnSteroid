@@ -242,11 +242,16 @@ RecentSettings recent_settings()
     result.extension = read(path, L"Extension", L"", L"Settings");
     return result;
 }
-void save_recent_settings(const RecentSettings& settings)
+void validate_recent_settings(const RecentSettings& settings)
 {
     if (settings.name.size() > 256 || settings.name.find_first_of(L"\r\n") != std::wstring::npos ||
         settings.extension.size() > 32 || settings.extension.find_first_of(L"\r\n/\\*?;:") != std::wstring::npos ||
         static_cast<unsigned>(settings.category) > static_cast<unsigned>(RecentCategory::other)) check(E_INVALIDARG);
+}
+
+void save_recent_settings(const RecentSettings& settings)
+{
+    validate_recent_settings(settings);
     {
         RecentLock lock;
         auto extension = lower(settings.extension);

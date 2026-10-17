@@ -13,10 +13,14 @@
  * VBWR E */
 
 #include "native/Support.hpp"
+#include "native/Dialog.hpp"
 #include "native/ThisPcEntries.hpp"
+#include "native/Configuration.hpp"
 #include "core/Catalog.hpp"
 #include "ProjectIdentity.hpp"
 #include "../resources/resource.h"
+#include <cerrno>
+#include <array>
 
 int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int)
 {
@@ -24,6 +28,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int)
     if(FAILED(initialized)) return 1;
     int count=0;
     auto* arguments=CommandLineToArgvW(GetCommandLineW(),&count);
+    bool worker = false;
     const auto status=mcos::guarded([&]{
         if(!arguments) return E_OUTOFMEMORY;
         if(count==1 || (count==2 && wcscmp(arguments[1],L"--open")==0))
@@ -32,8 +37,41 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int)
                 mcos::identity::parsing_name,nullptr,SW_SHOWNORMAL));
             return launched>32 ? S_OK : HRESULT_FROM_WIN32(ERROR_OPEN_FAILED);
         }
-        if(count==2 && wcscmp(arguments[1],L"--manage-this-pc")==0)
-            return mcos::launch_this_pc_entry_manager();
+        if(count==2 && wcscmp(arguments[1],L"--about")==0)
+        {
+            mcos::show_about_dialog(nullptr);
+            return S_OK;
+        }
+        if(count >= 2 && wcscmp(arguments[1], L"--this-pc-worker") == 0)
+        {
+            worker = true;
+            std::vector<std::wstring> values;
+            for (int index = 2; index < count; ++index) values.emplace_back(arguments[index]);
+            return mcos::run_this_pc_worker(values);
+        }
+        if((count==2 || count==7) &&
+            (wcscmp(arguments[1],L"--configure")==0 || wcscmp(arguments[1],L"--manage-this-pc")==0))
+        {
+            mcos::NativeUiScope ui;
+            RECT origin = mcos::dialog_origin(nullptr);
+            if(count==7)
+            {
+                if(wcscmp(arguments[2],L"--origin")!=0) return E_INVALIDARG;
+                std::array<LONG,4> coordinates{};
+                for(size_t index=0;index<coordinates.size();++index)
+                {
+                    wchar_t* end=nullptr;
+                    errno=0;
+                    coordinates[index]=wcstol(arguments[index+3],&end,10);
+                    if(errno || end==arguments[index+3] || *end) return E_INVALIDARG;
+                    if(coordinates[index] < -100000 || coordinates[index] > 100000) return E_INVALIDARG;
+                }
+                origin={coordinates[0],coordinates[1],coordinates[2],coordinates[3]};
+                if(origin.right<=origin.left || origin.bottom<=origin.top) return E_INVALIDARG;
+            }
+            mcos::show_configuration(origin);
+            return S_OK;
+        }
         if(count>=3 && wcscmp(arguments[1],L"--add-this-pc")==0)
         {
             std::vector<std::wstring> folders;
@@ -52,7 +90,8 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int)
         return S_OK;
     });
     LocalFree(arguments);
-    if(FAILED(status)) mcos::report_error(GetDesktopWindow(),status,IDS_ERROR_ADD);
+    if(FAILED(status) && !worker) mcos::report_error(GetDesktopWindow(),status,IDS_ERROR_CONFIGURATION);
     CoUninitialize();
+    if (worker) return static_cast<int>(status);
     return FAILED(status) ? 1 : 0;
 }
