@@ -17,15 +17,17 @@
 #include <Windows.h>
 #include <string>
 #include <vector>
+#include "Dialog.hpp"
 
 namespace mcos
 {
-// Opens the elevated native dialog that owns direct This PC folder registrations.
-// The caller can invoke it from the launcher without needing Registry write access.
-// Only current MCOS-owned registrations are read.
-HRESULT launch_this_pc_entry_manager();
-
 // Adds one or more real folders directly to This PC. If the launcher is not
 // elevated, it asks once and then continues with every supplied folder.
 HRESULT add_this_pc_folders(const std::vector<std::wstring>& paths);
+
+std::unique_ptr<NativeDialogPage> create_this_pc_page(HWND parent);
+
+// Elevated worker entry point: validates the caller SID and current-format
+// ownership before touching exact registration keys; never opens another UI.
+HRESULT run_this_pc_worker(const std::vector<std::wstring>& arguments);
 }

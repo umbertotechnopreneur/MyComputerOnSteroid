@@ -19,6 +19,8 @@ VBWR E -->
              Platform="$(var.Architecture)" Description="Native Windows Shell launcher" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of MyComputerOnSteroid is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Icon Id="ApplicationIcon" SourceFile="$(var.ProjectRoot)\resources\App.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ApplicationIcon" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/umbertotechnopreneur/MyComputerOnSteroid" />
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="DisableShutdown" />
     <Property Id="MCOS_WINDOWS_BUILD">
@@ -43,6 +45,7 @@ VBWR E -->
             <Component Id="LauncherBinary" Guid="{FAD19009-4B95-4557-BEBE-E21FCFE8DCD4}" Win64="yes">
               <File Id="LauncherExe" Source="$(var.BinDir)\MyComputerOnSteroid.exe" KeyPath="yes" />
               <File Id="LicenseFile" Source="$(var.ProjectRoot)\LICENSE" Name="LICENSE.txt" />
+              <File Id="SetupGuide" Source="$(var.ProjectRoot)\resources\Readme Setup.txt" Name="Readme Setup.txt" />
             </Component>
             <Component Id="ShellRegistration" Guid="*" Win64="yes">
               <RegistryKey Root="HKLM" Key="Software\Classes\CLSID\{B36B9212-2D35-4E65-8A97-0AA5D280E157}" ForceDeleteOnUninstall="yes">
@@ -53,7 +56,14 @@ VBWR E -->
                   <RegistryValue Type="string" Value="[INSTALLFOLDER]MyComputerOnSteroid.Shell.dll" />
                   <RegistryValue Name="ThreadingModel" Type="string" Value="Apartment" />
                 </RegistryKey>
-                <RegistryKey Key="DefaultIcon"><RegistryValue Type="string" Value="[System64Folder]imageres.dll,-109" /></RegistryKey>
+                <RegistryKey Key="DefaultIcon"><RegistryValue Type="string" Value="[INSTALLFOLDER]MyComputerOnSteroid.exe,0" /></RegistryKey>
+                <RegistryKey Key="shell\mcos.configure">
+                  <RegistryValue Name="MUIVerb" Type="string" Value="@[INSTALLFOLDER]MyComputerOnSteroid.exe,-302" />
+                  <RegistryValue Name="Icon" Type="string" Value="[INSTALLFOLDER]MyComputerOnSteroid.exe,0" />
+                  <RegistryKey Key="command">
+                    <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]MyComputerOnSteroid.exe&quot; --configure" />
+                  </RegistryKey>
+                </RegistryKey>
                 <RegistryKey Key="ShellFolder">
                   <RegistryValue Name="Attributes" Type="integer" Value="-1476394736" />
                 </RegistryKey>
@@ -69,16 +79,33 @@ VBWR E -->
       <Directory Id="ProgramMenuFolder">
         <Directory Id="StartFolder" Name="MyComputerOnSteroid">
           <Component Id="StartShortcut" Guid="*" Win64="yes">
-            <Shortcut Id="StartLauncher" Name="My Computer Enhanced" Target="[INSTALLFOLDER]MyComputerOnSteroid.exe" Arguments="--open" WorkingDirectory="INSTALLFOLDER" />
+            <Shortcut Id="StartLauncher" Name="My Computer Enhanced" Target="[INSTALLFOLDER]MyComputerOnSteroid.exe" Arguments="--open" WorkingDirectory="INSTALLFOLDER" Icon="ApplicationIcon" IconIndex="0" />
+            <Shortcut Id="StartConfiguration" Name="Configure My Computer Enhanced" Target="[INSTALLFOLDER]MyComputerOnSteroid.exe" Arguments="--configure" WorkingDirectory="INSTALLFOLDER" Icon="ApplicationIcon" IconIndex="0" />
             <RemoveFolder Id="RemoveStartFolder" On="uninstall" />
             <RegistryValue Root="HKCU" Key="Software\umbertogiacobbi.biz\MyComputerOnSteroid\Installer" Name="StartShortcut" Type="integer" Value="1" KeyPath="yes" />
           </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="McosUserDataFolder" Name="MyComputerOnSteroid">
+          <Directory Id="McosFavoritesFolder" Name="Favorites">
+            <Directory Id="McosFileFavoritesFolder" Name="Files">
+              <Component Id="SetupGuideShortcut" Guid="{6129C307-D288-4C69-BC37-EBC5771A0999}" Win64="yes">
+                <Shortcut Id="LauncherSetupGuide" Name="Readme Setup.txt" Target="[INSTALLFOLDER]Readme Setup.txt" WorkingDirectory="INSTALLFOLDER" />
+                <RegistryValue Root="HKCU" Key="Software\umbertogiacobbi.biz\MyComputerOnSteroid\Installer" Name="SetupGuideShortcut" Type="integer" Value="1" KeyPath="yes" />
+                <RemoveFolder Id="RemoveFileFavoritesFolder" On="uninstall" />
+                <RemoveFolder Id="RemoveFavoritesFolder" Directory="McosFavoritesFolder" On="uninstall" />
+                <RemoveFolder Id="RemoveUserDataFolder" Directory="McosUserDataFolder" On="uninstall" />
+              </Component>
+            </Directory>
+          </Directory>
         </Directory>
       </Directory>
     </Directory>
     <Feature Id="Launcher" Title="MyComputerOnSteroid" Level="1">
       <ComponentRef Id="ShellBinary" /><ComponentRef Id="LauncherBinary" />
       <ComponentRef Id="ShellRegistration" /><ComponentRef Id="StartShortcut" />
+      <ComponentRef Id="SetupGuideShortcut" />
     </Feature>
     <!-- Windows Installer supplies its standard basic progress UI. No third-party
          UI extension or custom-action DLL is embedded in this package. -->

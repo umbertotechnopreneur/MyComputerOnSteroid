@@ -178,7 +178,8 @@ private:
         {
             if(!_wcsicmp(name.c_str(),L"Office")) return 10;
             if(!_wcsicmp(name.c_str(),L"PDF")) return 11;
-            if(!_wcsicmp(name.c_str(),L"Sviluppo") || !_wcsicmp(name.c_str(),L"Development")) return 12;
+            if(!_wcsicmp(name.c_str(),L"Sviluppo") || !_wcsicmp(name.c_str(),L"Development") ||
+                !_wcsicmp(name.c_str(),text(IDS_TYPE_DEVELOPMENT).c_str())) return 12;
         }
         return 20; // Remaining families/extensions use natural alphabetical order.
     }

@@ -74,6 +74,8 @@ inline std::wstring display_name(IShellItem* item, SIGDN kind = SIGDN_NORMALDISP
 }
 
 std::wstring text(UINT resource_id);
+// Uses Windows display-language preferences, with English as the final fallback.
+LANGID ui_language();
 
 // The module containing these helpers: the Shell DLL in Explorer, or the EXE.
 HMODULE current_module();

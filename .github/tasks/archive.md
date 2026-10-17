@@ -1,5 +1,63 @@
 # Completed work archive
 
+## 2026-10-18 - Native configuration, dialogs and application artwork
+
+The implementation was handed off locally on 2026-10-17 and is now prepared for
+source delivery. These records do not close MCS-091/MCS-094 runtime acceptance.
+
+### MCS-093 - One configuration window and discoverable setup guide
+
+- Replaced the background settings list with Configure My Computer Enhanced.
+  Added a classic namespace-icon verb and Start configuration shortcut.
+- Embedded five native pages in one tabbed host, including direct favorite
+  actions and About. Shared layouts, icons, localization and DPI scopes remain.
+- Kept preferences in the normal user process; This PC mutations use a validated
+  elevated worker with HRESULT completion and cancellation preserving the editor.
+- Installed Readme Setup.txt and its Files favorite for the installing user.
+- x64 Release / ARM64 Debug compilation and string parity checks passed; native
+  suite/UI acceptance was not run. MSI validation retained its intentional ICE91
+  per-user-shortcut warning. Final authorized repair returned 0 (the first repair
+  returned 3010); installed EXE/DLL/guide hashes match. A reserved MSI Directory
+  identifier collision was corrected and the misplaced guide reference retained
+  in artifacts. Explorer was not restarted. Acceptance remains in MCS-094.
+
+### MCS-092 - Compact native layout and size-specific application artwork
+
+- Replaced tall edits and oversized action rows with native 9-point / 14-DLU
+  metrics; aligned field labels on the left, right-justified to a common edge.
+- Fit each localized header to its actual text height before capturing resize
+  anchors. Compacted About and made both links transparent on the dialog background.
+- Preserved accepted 16/24/32 PNG frames byte-for-byte, added detailed 48-256 ICO
+  frames and a separate 512-pixel PNG from the generated high-resolution master.
+- x64 Release / ARM64 Debug compilation passed. Visual acceptance of this
+  iteration remains in MCS-091; no new native UI session or test suite was run.
+  The x64 MSI passed ICE validation and the updated installation returned 3010;
+  both installed hashes match Release. Explorer was not restarted.
+
+### MCS-090 - Native dialog presentation and localization
+
+- Shared themed PMv2 dialog presentation, source-monitor placement through
+  elevation, description headers, consistent field layout and resize anchors.
+- Explicit Add new / Add / Save changes flow; large icon list and preview.
+- Simple About with fixed website/repository links and eight OS-selected
+  application UI languages, including Hong Kong Cantonese in Traditional script.
+- Pixel-art ICO with distinct small artwork, embedded in app windows and MSI.
+- Final x64 Release and ARM64 Debug compilation passed; x64 MSI passed WiX ICE
+  validation. The owner-authorized x64 installation returned 3010 and installed
+  hashes match Release. Provider reload and visual acceptance remain open in
+  MCS-091. No native suite/new UI session was run.
+
+### MCS-080 - Readability and current-format cleanup
+
+- Consolidated native helpers and background-menu metadata; expanded dialog/drop
+  flow and added comments for ownership, validation and asynchronous launch.
+- Removed the old importer, its staged migration script and the older font
+  fallback. The function belongs entirely to the app's current format.
+- Examples and remaining candidates are in [the review](../../docs/CODE_REVIEW.md).
+- Local verification is recorded in [validation](../../docs/VALIDATION.md).
+- Later local installation is recorded above; actual Explorer acceptance remains pending.
+
+
 ## 2026-10-12 - MCS-090: group presentation and document export
 
 - Kept stable group IDs while putting Drives before Folders and Apps, and Office,

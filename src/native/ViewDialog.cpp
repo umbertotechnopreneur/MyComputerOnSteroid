@@ -13,6 +13,7 @@
  * License: MIT
  * VBWR E */
 #include "ViewDialog.hpp"
+#include "Dialog.hpp"
 #include "../ProjectIdentity.hpp"
 #include "../../resources/resource.h"
 #include <array>
@@ -24,13 +25,6 @@ namespace
 struct DialogState
 {
     ViewSettings* settings;
-    std::array<HICON, 3> icons{};
-
-    ~DialogState()
-    {
-        for (const auto icon : icons)
-            if (icon) DestroyIcon(icon);
-    }
 };
 
 void populate_choices(HWND dialog, UINT control, std::initializer_list<UINT> labels, unsigned selected)
@@ -53,23 +47,9 @@ unsigned selected_choice(HWND dialog, UINT control)
     return static_cast<unsigned>(value);
 }
 
-// Stock icons belong to DialogState. Failure to decorate leaves usable controls.
 void initialize_view_dialog(HWND dialog, DialogState& state)
 {
     const auto& settings = *state.settings;
-    const UINT controls[]{IDC_VIEW_SEARCH_ICON, IDC_VIEW_GROUP_ICON, IDC_VIEW_FAMILY_ICON};
-    const SHSTOCKICONID stocks[]{SIID_FIND, SIID_FOLDER, SIID_DOCASSOC};
-
-    for (size_t index = 0; index < state.icons.size(); ++index)
-    {
-        SHSTOCKICONINFO icon{sizeof(icon)};
-        const auto status = SHGetStockIconInfo(stocks[index], SHGSI_ICON | SHGSI_SMALLICON, &icon);
-        if (FAILED(status)) continue;
-
-        state.icons[index] = icon.hIcon;
-        SendDlgItemMessageW(dialog, controls[index], STM_SETICON,
-            reinterpret_cast<WPARAM>(icon.hIcon), 0);
-    }
 
     SendDlgItemMessageW(dialog, IDC_VIEW_QUERY, EM_SETLIMITTEXT, 256, 0);
     SendDlgItemMessageW(dialog, IDC_VIEW_FAMILIES, EM_SETLIMITTEXT, 16384, 0);
@@ -103,7 +83,7 @@ HRESULT accept_view_dialog(HWND dialog, DialogState& state)
 
     if (FAILED(family_status))
     {
-        MessageBoxW(dialog, text(IDS_INVALID_FAMILIES).c_str(), identity::launcher_name, MB_OK | MB_ICONWARNING);
+        show_native_message(dialog, text(IDS_INVALID_FAMILIES));
         SetFocus(GetDlgItem(dialog, IDC_VIEW_FAMILIES));
         return S_FALSE;
     }
@@ -129,59 +109,42 @@ INT_PTR CALLBACK view_dialog(HWND dialog, UINT message, WPARAM first, LPARAM sec
 
         if (FAILED(status))
         {
-            report_error(dialog, status, IDS_ERROR_VIEW);
-            EndDialog(dialog, IDCANCEL);
+            fail_native_dialog(dialog, status);
         }
         return TRUE;
     }
 
-    if (message == WM_CTLCOLORSTATIC)
+    if (message == ReadDialogPage)
     {
-        const auto control = GetDlgCtrlID(reinterpret_cast<HWND>(second));
-        const bool is_hint = control == IDC_VIEW_SEARCH_HINT || control == IDC_VIEW_DATE_HINT ||
-            control == IDC_VIEW_FAMILY_HINT;
-        if (is_hint)
-        {
-            SetTextColor(reinterpret_cast<HDC>(first), GetSysColor(COLOR_GRAYTEXT));
-            SetBkColor(reinterpret_cast<HDC>(first), GetSysColor(COLOR_3DFACE));
-            return reinterpret_cast<INT_PTR>(GetSysColorBrush(COLOR_3DFACE));
-        }
+        auto* result = reinterpret_cast<HRESULT*>(second);
+        if (!result) return FALSE;
+        *result = guarded([&] {
+            auto* state = reinterpret_cast<DialogState*>(GetWindowLongPtrW(dialog, DWLP_USER));
+            return state ? accept_view_dialog(dialog, *state) : E_UNEXPECTED;
+        });
+        return TRUE;
     }
-
     if (message != WM_COMMAND) return FALSE;
 
-    const auto command = LOWORD(first);
-    if (command == IDCANCEL)
-    {
-        EndDialog(dialog, IDCANCEL);
-        return TRUE;
-    }
-    if (command == IDC_VIEW_CLEAR)
-    {
-        SetDlgItemTextW(dialog, IDC_VIEW_QUERY, L"");
-        SetFocus(GetDlgItem(dialog, IDC_VIEW_QUERY));
-        return TRUE;
-    }
-    if (command != IDOK) return FALSE;
-
-    const auto status = guarded([&] {
-        auto* state = reinterpret_cast<DialogState*>(GetWindowLongPtrW(dialog, DWLP_USER));
-        if (!state || !state->settings) return E_UNEXPECTED;
-        return accept_view_dialog(dialog, *state);
-    });
-
-    if (FAILED(status)) report_error(dialog, status, IDS_ERROR_VIEW);
-    else if (status == S_OK) EndDialog(dialog, IDOK);
+    if (LOWORD(first) != IDC_VIEW_CLEAR) return FALSE;
+    SetDlgItemTextW(dialog, IDC_VIEW_QUERY, L"");
+    SetFocus(GetDlgItem(dialog, IDC_VIEW_QUERY));
     return TRUE;
 }
 }
 
-bool choose_view_settings(HWND owner, ViewSettings& settings)
+std::unique_ptr<NativeDialogPage> create_view_page(HWND parent, ViewSettings& settings)
 {
-    DialogState state{&settings};
-    const auto result = DialogBoxParamW(current_module(), MAKEINTRESOURCEW(IDD_VIEW_OPTIONS),
-        owner, view_dialog, reinterpret_cast<LPARAM>(&state));
-    if (result == -1) check(HRESULT_FROM_WIN32(GetLastError()));
-    return result == IDOK;
+    auto state = std::make_shared<DialogState>();
+    state->settings = &settings;
+    const DialogAnchor anchors[]{
+        {IDC_DIALOG_HEADING, true}, {IDC_VIEW_DESCRIPTION, true}, {IDC_DIALOG_HEADER_LINE, true},
+        {IDC_VIEW_QUERY, true}, {IDC_VIEW_FIELD, true}, {IDC_VIEW_GROUP, true},
+        {IDC_VIEW_DIRECTION_LABEL, false, true}, {IDC_VIEW_DIRECTION, false, true},
+        {IDC_VIEW_FAMILIES, true, false, true},
+        {IDC_DIALOG_FOOTER_LINE, true, false, false, true},
+        {IDC_VIEW_CLEAR, false, false, false, true}};
+    return NativeDialogPage::create(IDD_VIEW_OPTIONS, parent, view_dialog,
+        reinterpret_cast<LPARAM>(state.get()), anchors, state);
 }
 }

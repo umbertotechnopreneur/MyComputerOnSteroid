@@ -14,4 +14,9 @@
 
 #pragma once
 #include "Support.hpp"
-namespace mcos { void choose_recent_filters(HWND owner); }
+#include "Dialog.hpp"
+#include "../core/Recents.hpp"
+namespace mcos
+{
+std::unique_ptr<NativeDialogPage> create_recent_page(HWND parent, RecentSettings& settings);
+}

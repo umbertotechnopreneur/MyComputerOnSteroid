@@ -14,6 +14,10 @@
 cmake_minimum_required(VERSION 3.25)
 project(MyComputerOnSteroid LANGUAGES CXX RC)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set_property(SOURCE resources/Shell.rc APPEND PROPERTY OBJECT_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/Dialogs.rc2"
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/Strings.rc2"
+    "${CMAKE_CURRENT_SOURCE_DIR}/resources/App.ico")
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "Use the Visual Studio C++ toolchain and Windows SDK.")
@@ -33,6 +37,7 @@ add_library(MyComputerOnSteroid.Shell SHARED
     src/core/Recents.cpp
     src/core/ViewSettings.cpp
     src/native/Support.cpp
+    src/native/Dialog.cpp
     src/native/RecentDialog.cpp
     src/native/ViewDialog.cpp
     src/native/MenuIcons.cpp
@@ -45,15 +50,18 @@ add_library(MyComputerOnSteroid.Shell SHARED
     resources/Shell.rc
 )
 target_compile_features(MyComputerOnSteroid.Shell PRIVATE cxx_std_20)
+target_include_directories(MyComputerOnSteroid.Shell PRIVATE resources)
 target_compile_definitions(MyComputerOnSteroid.Shell PRIVATE
     UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX
+    ISOLATION_AWARE_ENABLED=1
     WINVER=0x0A00 _WIN32_WINNT=0x0A00
 )
 target_compile_options(MyComputerOnSteroid.Shell PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:/W4;/WX;/permissive-;/utf-8;/EHsc;/guard:cf;/sdl>"
 )
-target_link_options(MyComputerOnSteroid.Shell PRIVATE /DYNAMICBASE /NXCOMPAT /GUARD:CF)
-target_link_libraries(MyComputerOnSteroid.Shell PRIVATE shell32 shlwapi ole32 oleaut32 uuid propsys bcrypt)
+target_link_options(MyComputerOnSteroid.Shell PRIVATE /DYNAMICBASE /NXCOMPAT /GUARD:CF
+    "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'")
+target_link_libraries(MyComputerOnSteroid.Shell PRIVATE shell32 shlwapi ole32 oleaut32 uuid propsys bcrypt comctl32)
 set_target_properties(MyComputerOnSteroid.Shell PROPERTIES
     CXX_EXTENSIONS OFF
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
@@ -65,16 +73,23 @@ add_executable(MyComputerOnSteroid WIN32
     src/core/Catalog.cpp
     src/core/Recents.cpp
     src/native/Support.cpp
+    src/native/Dialog.cpp
+    src/core/ViewSettings.cpp
+    src/native/Configuration.cpp
+    src/native/ViewDialog.cpp
+    src/native/RecentDialog.cpp
     src/native/ThisPcEntries.hpp
     src/native/ThisPcEntries.cpp
     resources/Shell.rc
 )
-add_executable(MyComputerOnSteroid.Tests tests/NativeTests.cpp src/core/Catalog.cpp src/core/Recents.cpp src/core/ViewSettings.cpp src/native/Support.cpp src/shell/ItemId.cpp resources/Shell.rc)
+add_executable(MyComputerOnSteroid.Tests tests/NativeTests.cpp src/core/Catalog.cpp src/core/Recents.cpp src/core/ViewSettings.cpp src/native/Support.cpp src/native/Dialog.cpp src/shell/ItemId.cpp resources/Shell.rc)
 foreach(target MyComputerOnSteroid MyComputerOnSteroid.Tests)
+    target_include_directories(${target} PRIVATE resources)
     target_compile_features(${target} PRIVATE cxx_std_20)
     target_compile_definitions(${target} PRIVATE MCOS_EXECUTABLE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX WINVER=0x0A00 _WIN32_WINNT=0x0A00)
     target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/W4;/WX;/permissive-;/utf-8;/EHsc;/guard:cf;/sdl>")
+    target_sources(${target} PRIVATE resources/Application.manifest)
     target_link_options(${target} PRIVATE /DYNAMICBASE /NXCOMPAT /GUARD:CF)
-    target_link_libraries(${target} PRIVATE shell32 shlwapi ole32 oleaut32 uuid propsys bcrypt advapi32)
+    target_link_libraries(${target} PRIVATE shell32 shlwapi ole32 oleaut32 uuid propsys bcrypt advapi32 comctl32)
     set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endforeach()
