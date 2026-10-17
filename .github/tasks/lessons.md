@@ -1,5 +1,25 @@
 # Engineering lessons
 
+- Use standard 9-point / 14-DLU native control metrics for ordinary forms. Size
+  descriptive headers from localized text rather than reserving oversized fixed
+  blocks; capture resize anchors only after this initial layout is complete.
+- Small-icon acceptance does not imply the same artwork should be enlarged for
+  Explorer. Keep pixel art in small ICO frames and provide detailed large frames.
+
+- Prefix application-owned MSI Directory identifiers: FavoritesFolder and other
+  standard identifiers resolve to Windows-managed profile directories even when
+  authored under another parent. Check the actual installed shortcut target and
+  location; successful MSI completion and binary hashes do not prove discoverability.
+- Keep a settings hub unelevated; isolate machine registration mutations in a
+  worker that checks user identity, exact ownership and completion before reloading.
+
+- Give each native window one language-neutral layout and localized resources;
+  avoid duplicating geometry across translations. Keep descriptions in headers.
+- Scope extension UI DPI/activation contexts and restore the host thread state.
+  Preserve source-monitor geometry explicitly across an elevated process launch.
+- A small pixel-art ICO needs dedicated small artwork; shrinking a detailed
+  master or applying smooth interpolation destroys its intended silhouette.
+
 - Define merged menu actions, labels, glyphs and errors together. Numeric offsets
   in separate dispatch chains drift when a new command is inserted.
 - Support only the current app format; do not retain importers or migration

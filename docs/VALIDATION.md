@@ -1,5 +1,104 @@
 # Validation record
 
+## Unified configuration and local reinstall, 2026-10-17
+
+- Implemented the single Configure background command and an out-of-process
+  native tab host with This PC folders, Favorites, Search and view, Recent items
+  and About pages. The namespace CLSID has a localized classic Configure verb;
+  a Start shortcut reaches the same opener. Compact-menu placement is not proven.
+- Final x64 Release and ARM64 Debug compilation passed with `/W4 /WX` after
+  correcting an intermediate missing closing block in the page refactor.
+  The native test executable was compiled, not run. Its background-menu regression
+  now checks one localized command and rejects obsolete noninteractive offsets.
+- All eight resource sets contain the same 120 string identifiers with no
+  duplicate identifiers. This checks resource parity, not translation quality
+  or rendered text widths. `git diff --check` passed.
+- The x64 0.0.0 development MSI linked and completed ICE validation with one
+  expected ICE91 warning: the guide shortcut is deliberately per-user in a
+  per-machine package, not copied to every profile. It retains the installed
+  ProductCode; no release or publication was performed.
+- The initial owner-authorized repair returned 3010 (Windows restart required);
+  the corrected package's repair returned 0. Automatic application shutdown and
+  restart were suppressed in both. Installed EXE, DLL and
+  Readme Setup.txt hashes match their final sources/build. Evidence is in ignored
+  artifacts/install-20261017/configuration-corrected-result.json and its MSI log.
+- Verified the installed Configure verb/command, Start configuration shortcut and
+  guide shortcut target through read-only registry/shortcut inspection. No guide
+  shortcut existed at either checked destination before installation; no unrelated
+  favorite was replaced. No per-user InprocServer32 override was present.
+- The first install exposed an MSI Directory identifier collision with Windows'
+  standard FavoritesFolder. App-owned directory IDs were prefixed and the package
+  rebuilt/reinstalled. The misplaced project-created guide reference was retained
+  under ignored artifacts after verifying its exact installed-guide target.
+  Only its then-empty, project-created Files directory was removed; unrelated
+  Favorites content was not touched. The reference can be recovered from artifacts.
+- Explorer was not restarted and no new native UI session was opened. Tab layout,
+  DPI/keyboard/high-contrast behavior, all-language wrapping, root/background menu
+  visibility after reload, guide opening, UAC cancellation and worker save/remove
+  against disposable registrations remain runtime acceptance work. Cross-user
+  UAC and worker argument rejection have source validation, not runtime evidence.
+
+## Compact dialog revision and detailed large icons, 2026-10-17
+
+- The owner's screenshots showed readable dialog text at the current desktop
+  scale, with oversized controls/header space and gray SysLink backgrounds. That
+  observation applies to the earlier installed iteration, not this revision.
+- All four dialog templates now use 9-point Segoe UI, 14-DLU single-line edits,
+  compact buttons and field labels on the left, right-aligned to a common edge.
+  Localized header text is measured before the content and resize anchors are
+  finalized. About has a compact icon/title header and transparent links.
+- Final Release x64 and Debug ARM64 compilation passed with `/W4 /WX`; the x64
+  0.0.0 MSI passed WiX ICE validation and retained the installed ProductCode.
+- The installed EXE and DLL hashes match this final Release build. Windows
+  Installer returned 3010 (system restart required); Explorer was not restarted.
+  Local installation evidence is under ignored artifacts/install-20261017/.
+- Accepted 16/24/32-pixel PNG frames were verified byte-for-byte unchanged. The
+  48-256 ICO frames use the newly generated detailed master; a separate 512 PNG
+  was prepared from that higher-resolution master. The 48/256/512 output assets
+  were visually inspected; this does not establish Explorer icon-cache behavior.
+- No native test suite or new application UI session was run. Current control
+  placement, text wrapping in every language, resize/DPI transitions and live
+  About presentation remain owner acceptance work in MCS-091.
+
+## Owner-authorized local installation, 2026-10-17
+
+- Installed the prepared x64 0.0.0 package as an in-place development repair,
+  retaining the existing ProductCode and using REINSTALL=ALL / REINSTALLMODE=vamus.
+- Windows Installer returned 3010: installation succeeded with a system restart
+  required. Automatic system and application shutdown were suppressed.
+- Both installed EXE and Shell DLL SHA-256 hashes match the final Release x64
+  build. The machine registration points to that installed DLL; DefaultIcon
+  points to the installed application icon. No per-user provider override was found.
+- Explorer still has the provider loaded. No Explorer restart or application
+  dialog session was performed, so loading the updated provider in Explorer and
+  visual/DPI/language acceptance are not established by this installation.
+- The installer log and local verification result are retained under ignored
+  artifacts/install-20261017/. This was not a release or public delivery.
+
+## Native dialog presentation, languages and pixel-art icon, 2026-10-17
+
+- Final Release x64 and Debug ARM64 compilation passed with `/W4 /WX` after
+  adding shared dialog presentation, explicit add/edit state, icon list/preview,
+  About, eight language resource sets and the pixel-art application icon.
+- The x64 0.0.0 development MSI passed full WiX ICE validation. Its icon metadata,
+  shortcut and namespace icon source point to the new application artwork.
+  The final package retains the existing development ProductCode. It was not
+  installed during the implementation pass; the later installation is recorded above.
+- ICO encoding verified ten frames (16, 20, 24, 32, 40, 48, 64, 96, 128 and 256).
+  The 16/24/32 PNG frames were inspected at their actual sizes. This establishes
+  asset inspection only, not title-bar rendering in a running application.
+- Native tests were compiled but not run. The implementation pass did not perform
+  a new native UI session, installation, provider registration, Explorer restart
+  or remote CI run.
+- PMv2 monitor changes, source-window placement, UAC handoff, the add/edit flow,
+  high contrast, keyboard/screen-reader behavior and every translation's visible
+  layout still require acceptance. No human linguistic review is claimed.
+- The owner separately requested deletion of four obsolete direct This PC
+  registrations without backups. All sixteen exact namespace/class keys were
+  verified absent across HKCU/HKLM and all four real target folders still existed.
+  This was local machine maintenance, not an importer or product migration.
+
+
 ## Native readability and current-format cleanup, 2026-10-17
 
 - Debug x64 compilation and the isolated native suite passed for the shared

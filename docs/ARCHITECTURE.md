@@ -12,10 +12,12 @@ normal sorting. The visible name is **My Computer Enhanced**.
 | core/Recents | Optional Windows history source, private cache, filters, dates, pins and hiding |
 | core/ViewSettings | Atomic preferences, target metadata, search and extension-family policy |
 | native/Support | COM/PIDL ownership, HRESULT boundaries, process/argument helpers, dialog text, resources and diagnostics |
+| native/Dialog | Scoped visual styles and DPI, shared localized dialog layout, monitor placement and About |
+| native/Configuration | Single tabbed settings host, favorite actions and public Shell view refresh |
 | native/RecentDialog | Standard Win32 filter dialog: edit, combo, checkbox and buttons |
-| native/ViewDialog | Standard Win32 search/group/order dialog and OS stock icon lifetime |
+| native/ViewDialog | Standard Win32 search/group/order dialog and extension-family editing |
 | native/MenuIcons | DPI-sized, theme-aware glyph bitmaps owned for native menu lifetime |
-| native/ThisPcEntries | Elevated native dialog and current owned direct This PC folder registrations |
+| native/ThisPcEntries | This PC settings page and validated elevated registration worker |
 | shell/ItemId | Validated child PIDLs and delegation to real Shell items |
 | shell/TransferData | Reference Shell identity with document target file-transfer formats |
 | shell/Grouping | Section, extension and editable family category providers |
@@ -77,12 +79,15 @@ other items use target suffixes rather than .lnk or renamed aliases. Dynamic
 category names at the same presentation rank use StrCmpLogicalW. A categorizer reads current family
 definitions per batch so edits do not leave stale classification.
 
-The native background command obtains the owner's active view through public
-IShellWindows, IWebBrowser2, IShellBrowser and IFolderView services, verifies its
-root PIDL, then uses IFolderView2 SetGroupBy/SetSortColumns/SetText and Refresh.
-The view is retained for the command only, avoiding a folder/view lifetime cycle.
-Apply affects that view; notifications refresh other windows' collections without
-forcing their native layout choices. There are no private HWND assumptions.
+The single background command launches the native opener with `--configure` and
+the source window rectangle. A localized classic verb on the namespace CLSID and
+a Start shortcut reach the same window without first entering the launcher.
+After Apply, the opener finds launcher views through public IShellWindows,
+IShellBrowser and IFolderView services, verifies their exact root PIDLs and uses
+IFolderView2 SetGroupBy/SetSortColumns/SetText and Refresh. Preferences apply to
+every discovered active launcher view, with a namespace notification as well.
+COM view references are scoped to the refresh; no private HWND assumptions,
+Explorer process changes or persistent folder/view cycles are introduced.
 
 The per-user view.ini is a bounded UTF-16 preference record, not a conventional
 INI. It holds enum choices, query and multiline family definitions. Names and
@@ -93,10 +98,68 @@ corrupt/unreadable optional preferences fall back to unfiltered sections.
 Owned paths reject reparse points. Link metadata is read without Resolve or target
 execution; optional date lookup skips network targets.
 
-The English/Italian dialog uses standard edit, combo, group-box and button
-controls. Decorative search/folder/document icons come from SHGetStockIconInfo
-and are destroyed after the dialog closes. Hint colors follow system colors;
-failed decoration leaves usable text. File-type icons keep Windows associations.
+The dialogs use standard edit, combo, list-view and button controls. Each dialog
+has a description in its header and a common action row. A 9-point Segoe UI font,
+14-dialog-unit single-line edits, compact buttons and right-aligned labels to the
+left of fields keep native metrics and consistent baselines. Header copy is
+measured with the actual dialog font after localization; the separator, content
+and window height move together before resize anchors are captured. This removes
+unused header space while preserving wrapped translations and normal control sizes.
+The This PC manager uses an icon list at 96 logical pixels, previews the selected
+icon, and distinguishes adding a new entry from editing a selection. Icon
+extraction does not execute its source file; image lists copy the pixels and own
+no target folder. Handles and fonts are released after the dialog closes.
+
+Configuration uses one modal host and a native tab control: This PC folders,
+Favorites, Search and view, Recent items and About. Existing language-neutral
+DIALOGEX templates are cloned as DS_CONTROL child pages, with explicit controller,
+HWND and presentation-frame lifetimes. Child pages share the host's message loop,
+font/DPI scope and keyboard navigation; hidden modal footer buttons cannot act.
+Preference pages validate before writes. Apply saves both preference groups and
+then refreshes discovered launcher views. The two preference files are not one
+transaction: an I/O/refresh failure can leave earlier saves applied and is reported
+as such. Close does not save pending preference edits. This PC/favorite actions
+and restoring hidden recent entries are immediate, separate operations.
+
+The configuration process stays unelevated. This PC mutations use a hidden
+elevated opener worker, not another settings window. The worker checks the
+original user's SID, GUID syntax, target directory and ownership in both hives;
+different-account elevation is rejected rather than writing another user's HKCU.
+The owner window is disabled while a message-pumping wait obtains the worker's
+HRESULT exit code. Cancelling UAC preserves the editor and makes no mutation.
+
+One language-neutral dialog template per window keeps layout identical across
+translations. String blocks are selected explicitly from Windows display-language
+preferences without changing Explorer's thread language. Supported resources are
+en-US, it-IT, vi-VN, fr-FR, de-DE, es-ES, zh-CN and zh-HK; English is the fallback.
+Hong Kong/Macau Chinese and yue preferences select the Cantonese resources in
+Traditional characters; other Chinese preferences select Simplified Chinese.
+Existing user-defined family names are data and are not translated on load.
+
+The opener manifest declares PerMonitorV2 and Common Controls v6. The DLL embeds
+its own v6 dependency and uses the SDK's isolation-aware controls. A UI scope
+activates the current module's manifest and restores the previous thread DPI and
+activation contexts on exit; it never changes Explorer's process DPI mode.
+Windows handles PMv2 font/control scaling. Shared anchors handle user resizing
+from original DPI-normalized bounds; application icons are reloaded at the new
+DPI. Dialog descriptions and backgrounds use system colors for high contrast.
+
+Dialog placement uses the source top-level window rectangle and clamps to that
+monitor's work area. With no usable owner it uses the pointer's monitor. The
+configuration command line carries a bounded source rectangle, not a foreign HWND.
+It does not persist placement. A hidden positioning owner supplies the initial
+monitor/DPI to the out-of-process configuration window. Elevated registration
+workers display no settings window of their own.
+About uses a compact icon/title header and transparent keyboard-accessible SysLink
+controls for two fixed URLs. Its body avoids repeating the localized window title.
+Error/validation messages use standard TaskDialog UI with the application icon.
+File-type icons and native common file/folder pickers keep Windows associations.
+
+The application icon keeps the accepted 16/24/32-pixel artwork unchanged. Pixel
+art is used below 48 pixels; a separate detailed master supplies the 48-256 pixel
+frames. Its ICO contains ten sizes from 16 to 256 pixels. A separate 512-pixel
+PNG is prepared from the high-resolution detailed master, outside the ICO format.
+Asset provenance, hashes and generation prompts are in [ASSETS.md](ASSETS.md).
 
 ## Native presentation
 
@@ -127,6 +190,15 @@ Favorite LNK files live in Folders, Apps and Files under
 preserves its target PIDL, arguments, working directory and icon. Deduplication
 uses target identity plus launch arguments within the selected section.
 Classification does not execute the target or call IShellLink::Resolve.
+
+The MSI installs Readme Setup.txt in the application directory and creates an
+ordinary Files favorite shortcut for the installing user. It uses the same owned
+reference/PIDL contracts as other favorites; no built-in item type or data-format
+fallback is introduced. The installer owns that one shortcut, not other favorites.
+Its per-user placement is intentional in the per-machine package (ICE91 warning):
+the shortcut is not automatically copied into every Windows user's profile.
+Removing it in the launcher preserves the installed guide; a later repair can
+restore the MSI-owned shortcut. The configuration window also opens the guide.
 
 Writes use temporary links and atomic rename. Delete, rename and icon changes
 validate the exact owned directory and reject reparse points. A favorite's target
