@@ -4,6 +4,11 @@
 
 ### Added
 
+- Repository workspace launcher at `docs/open-code-here.bat`, which opens the
+  repository root in VS Code and reports when its command is unavailable.
+- Explicit targeted Windows Defender first-import policy for third-party
+  prebuilt binaries and compiled libraries in the README.
+
 - One **Configure My Computer Enhanced** command and a native tabbed window for
   This PC folders, favorites, search/view, recent items and About. It is also
   reachable directly from the This PC namespace icon and a Start shortcut.
