@@ -26,8 +26,11 @@
   this new repository authorizes its initial bootstrap commit on main. Subsequent
   code delivery uses focused codex/ branches and pull requests, with squash merge
   after required checks and review conversations are resolved. Preserve protections.
-- Documentation-only delivery may use the current branch when authorized, with
-  [skip ci] unless verification is requested. Never bypass required checks.
+- For owner-authorized documentation-only or repository-instruction-only delivery,
+  commit and push directly on the current branch with `[skip ci]`. Do not create
+  a branch or pull request or start CI/CD, builds or tests. Keep code changes
+  under their normal review and validation rules. Report any GitHub protection
+  that blocks documentation delivery; do not start CI/CD to satisfy it.
 - Do not install/register a Shell extension, restart Explorer, change system
   settings, create releases/tags or publish binaries without authorization for
   that action. A compilation or repository publication is not installation.
