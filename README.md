@@ -83,20 +83,6 @@ More of my apps:
 [MIT license](LICENSE) · [Contribute](CONTRIBUTING.md) ·
 [Get help](SUPPORT.md) · [Report a security issue](SECURITY.md)
 
----
-
-<p align="right">
-  <a href="https://umbertogiacobbi.biz/vibeware/manifesto">
-    <img src="docs/assets/vibeware/vibeware-logo.png" alt="VibeWare movement logo" width="120">
-  </a><br>
-  Participating in the <strong>VibeWare movement</strong><br>
-  <em>Human intent, AI execution, and plenty of tokens</em><br>
-  <a href="https://umbertogiacobbi.biz/vibeware/manifesto"><strong>MANIFESTO</strong></a>
-</p>
-
-I develop this app with AI under my direction. Its creator and publisher is
-Umberto Giacobbi. VibeWare is a movement I take part in.
-
 ## External binary security policy
 
 Before including any third-party prebuilt binary or compiled library in this
@@ -113,3 +99,16 @@ detection with exclusions, allowlisting, restored quarantine items or disabled
 protection without separate explicit owner approval.
 
 This rule applies to future imports; it does not certify existing dependencies.
+
+---
+
+<p align="right">
+  <a href="https://umbertogiacobbi.biz/vibeware/manifesto">
+    <img src="docs/assets/vibeware/vibeware-logo.png" alt="VibeWare movement logo" width="120">
+  </a><br>
+  <em>Human Intent, AI Execution, Plenty of Token</em><br>
+  <a href="https://umbertogiacobbi.biz/vibeware/manifesto"><strong>MANIFESTO</strong></a>
+</p>
+
+I develop this app with AI under my direction. Its creator and publisher is
+Umberto Giacobbi. VibeWare is a movement I take part in.
