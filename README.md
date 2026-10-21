@@ -102,13 +102,16 @@ This rule applies to future imports; it does not certify existing dependencies.
 
 ---
 
+I develop this app with AI under my direction. Its creator and publisher is
+Umberto Giacobbi. VibeWare is a movement I take part in.
+
+[**MANIFESTO**](https://umbertogiacobbi.biz/vibeware/manifesto)
+
+[Terms](https://umbertogiacobbi.biz/terms/) · [Privacy](https://umbertogiacobbi.biz/privacy/)
+
 <p align="right">
   <a href="https://umbertogiacobbi.biz/vibeware/manifesto">
     <img src="docs/assets/vibeware/vibeware-logo.png" alt="VibeWare movement logo" width="120">
   </a><br>
-  <em>Human Intent, AI Execution, Plenty of Token</em><br>
-  <a href="https://umbertogiacobbi.biz/vibeware/manifesto"><strong>MANIFESTO</strong></a>
+  <em>Human Intent, AI Execution, Plenty of Token</em>
 </p>
-
-I develop this app with AI under my direction. Its creator and publisher is
-Umberto Giacobbi. VibeWare is a movement I take part in.
