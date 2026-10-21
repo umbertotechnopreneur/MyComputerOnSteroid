@@ -13,6 +13,11 @@ existing copyright and third-party notices. Declare material AI assistance with
 the [source template](templates/source-header.cpp.txt) and a specific PR note;
 do not claim human review that did not happen.
 
+For owner-authorized documentation-only changes, commit and push on the current
+branch with `[skip ci]`. No pull request, CI, build or test is needed. The native
+workflow skips changes limited to Markdown, `docs/` and `LICENSE`. The owner's
+administrator bypass allows direct documentation delivery to `main`.
+
 Keep the changelog and task records aligned with the final change. An implemented
 item moves from `todo.md` to `done.md`, then to `archive.md` after delivery. Keep
 unverified behavior as open work, with an observable completion condition.

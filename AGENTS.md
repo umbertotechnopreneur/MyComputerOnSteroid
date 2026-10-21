@@ -29,8 +29,17 @@
 - For owner-authorized documentation-only or repository-instruction-only delivery,
   commit and push directly on the current branch with `[skip ci]`. Do not create
   a branch or pull request or start CI/CD, builds or tests. Keep code changes
-  under their normal review and validation rules. Report any GitHub protection
-  that blocks documentation delivery; do not start CI/CD to satisfy it.
+  under their normal review and validation rules.
+- The native workflow excludes Markdown files, `docs/` and `LICENSE` from both
+  push and pull-request triggers when they are the only changed files. Keep
+  these filters aligned. Mixed code/documentation changes use the code workflow.
+- GitHub's `main` protection keeps required pull requests and the Debug x64/ARM64
+  checks, with administrator enforcement disabled so the owner can deliver
+  documentation directly. GitHub's administrator bypass is role-wide; use it
+  only for owner-authorized documentation or repository-instruction delivery.
+  Code changes still require a pull request and their required checks. Never
+  start CI just to deliver documentation or change protection without an explicit
+  owner request.
 - Do not install/register a Shell extension, restart Explorer, change system
   settings, create releases/tags or publish binaries without authorization for
   that action. A compilation or repository publication is not installation.
